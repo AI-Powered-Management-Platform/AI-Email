@@ -13,7 +13,12 @@ own MTA queue, and protects deliverability instead of renting it.
 
 ⚠️ Port 25 is blocked on DigitalOcean. Sending nodes must run elsewhere.
 
-Security hardening backlog: [SECURITY.md](SECURITY.md)
+| Document | Contents |
+| --- | --- |
+| [SECURITY.md](SECURITY.md) | Hardening backlog, prioritised |
+| [docs/threat-model.md](docs/threat-model.md) | T1–T9 attacks and controls |
+
+⚠️ Read T1 first. An API key is a bearer credential.
 
 ---
 
@@ -33,7 +38,8 @@ Security hardening backlog: [SECURITY.md](SECURITY.md)
 
 ### A — API-first sending
 
-REST send endpoint plus SMTP relay. Idempotency keys on every request.
+REST send endpoint plus SMTP relay. Idempotency keys on every request. Scoped,
+expiring keys with optional request signing — see T1 in the threat model.
 
 ### B — Bounce and complaint handling
 
@@ -45,7 +51,8 @@ Lists, segments, custom fields, import with dedupe.
 
 ### D — DKIM, SPF, DMARC, ARC
 
-Per-domain key generation, signing, rotation, and alignment checks.
+Per-domain key generation, signing, rotation, and alignment checks. Replay
+defences built in: short `x=` expiry, no `l=` tag, oversigned headers.
 
 ### E — Event stream
 
@@ -110,7 +117,8 @@ Global and per-list suppression. RFC 8058 one-click unsubscribe.
 
 ### T — Transport security
 
-Opportunistic and enforced TLS, MTA-STS policy, TLS-RPT ingestion.
+Opportunistic and enforced TLS, MTA-STS policy, TLS-RPT ingestion, DANE/TLSA
+validation, hybrid ML-KEM key exchange on the API.
 
 ### U — URL click tracking
 
@@ -122,7 +130,7 @@ Syntax, MX lookup, role-account and disposable-domain detection.
 
 ### W — Webhook delivery
 
-HMAC-signed payloads, timestamp replay window, retry with backoff.
+RFC 9421 HTTP Message Signatures, timestamp replay window, retry with backoff.
 
 ### X — Custom headers and tags
 

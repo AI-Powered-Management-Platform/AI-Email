@@ -6,6 +6,8 @@ provider rules. Each item is a feature to build, not advice.
 Priority: **P0** ship before first external send · **P1** before paid tenants ·
 **P2** roadmap.
 
+Attack mechanics behind these controls: [docs/threat-model.md](docs/threat-model.md).
+
 ---
 
 ## 1. Signature replay — the ESP-specific killer
@@ -80,7 +82,34 @@ unauthenticated mail goes to spam, not the inbox.
 
 ---
 
-## 5. Relay and API surface
+## 5. Sending credential lifecycle
+
+An API key is a bearer credential. No login, no MFA, no expiry by default. A
+leaked key is full send authority until someone notices the complaint rate.
+Full analysis in [T1](docs/threat-model.md).
+
+| P | Feature | Detail |
+| --- | --- | --- |
+| P0 | Scoped keys | Per domain, stream, and action |
+| P0 | Key expiry by default | No immortal credentials |
+| P0 | Distinct key prefix | Enables public secret scanners |
+| P0 | Never display key twice | Fewer copies in the wild |
+| P0 | Last-used and source IP | Owner spots the stranger |
+| P0 | Two live keys for rotation | Rotate without downtime |
+| P0 | Per-key send quota | Caps the blast radius |
+| P0 | Instant per-key kill switch | Stop mid-campaign |
+| P1 | Request signing (RFC 9421) | Key signs, never transits |
+| P1 | Short-lived minted tokens | Derived from the key |
+| P1 | Secret-scanner webhook | Auto-revoke on public leak |
+| P1 | Dedicated IP per large tenant | Isolates reputation damage |
+| P2 | mTLS for high-volume tenants | Certificate-bound credential |
+
+⚠️ Console sessions grant key creation, so they are equally sensitive. Require
+fresh authentication before creating a key or adding a domain.
+
+---
+
+## 6. Relay and API surface
 
 | P | Feature | Detail |
 | --- | --- | --- |
@@ -94,7 +123,7 @@ unauthenticated mail goes to spam, not the inbox.
 
 ---
 
-## 6. AI-specific risk
+## 7. AI-specific risk
 
 Your AI features read attacker-authored email content. That content is data,
 never instructions.
@@ -109,7 +138,7 @@ never instructions.
 
 ---
 
-## 7. Post-quantum readiness
+## 8. Post-quantum readiness
 
 | P | Feature | Detail |
 | --- | --- | --- |
