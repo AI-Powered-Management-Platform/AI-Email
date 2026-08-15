@@ -178,6 +178,52 @@ Lifecycle and console features every serious ESP ships.
 
 ---
 
+## Compared to alternatives
+
+### Resend — the rented ESP
+
+| Area | Resend | AI-Email |
+| --- | --- | --- |
+| Core sending, webhooks, suppression | ✅ | ✅ parity planned |
+| IP pools, warmup automation | ⚠️ paid add-on | ✅ core feature |
+| AI spam-predict, subject, send-time | ❌ | ✅ built in |
+| Khmer-first rendering | ❌ | ✅ built in |
+| SMS / Telegram fallback | ❌ | ✅ built in |
+| Inbox placement seed tests | ❌ | ✅ built in |
+| Hosted DMARC and MTA-STS | ❌ | ✅ built in |
+| Key expiry, quotas, kill switch | ⚠️ partial | ✅ designed in |
+| Request signing (RFC 9421) | ❌ | ✅ designed in |
+| Recipient data custody | ⚠️ their servers | ✅ our KMS |
+
+Resend is proven in production; this design is not yet built. The send API is
+deliberately Resend-shaped, so switching either direction is two config values.
+
+### Gmail and Workspace SMTP — where small senders start
+
+| Area | Gmail SMTP | AI-Email |
+| --- | --- | --- |
+| Daily volume | ❌ 500–2,000 cap | ✅ scales with warmup |
+| Bulk and marketing | ❌ forbidden by terms | ✅ core feature |
+| Send API, idempotency | ❌ | ✅ REST plus SMTP |
+| Bounce handling, suppression | ❌ manual | ✅ automatic |
+| Webhooks and analytics | ❌ | ✅ full stream |
+| Multi-tenant domains and keys | ❌ one sender | ✅ core design |
+| Credentials | ⚠️ app passwords | ✅ scoped, expiring keys |
+
+Gmail is not a competitor — it is the judge. Mailbox providers set the rules
+our mail must pass; see [SECURITY.md](SECURITY.md) section 3.
+
+| Product | Its job |
+| --- | --- |
+| Gmail | Receive, store, judge mail |
+| Resend | Rented sending pipes |
+| AI-Email | Owned sending pipes, AI-assisted |
+
+Our customers are the businesses that outgrew Gmail SMTP and want more than
+rented pipes.
+
+---
+
 ## Non-goals
 
 | Not building | Reason |
