@@ -16,7 +16,7 @@ own MTA queue, and protects deliverability instead of renting it.
 | Document | Contents |
 | --- | --- |
 | [SECURITY.md](SECURITY.md) | Hardening backlog, prioritised |
-| [docs/threat-model.md](docs/threat-model.md) | T1–T9 attacks and controls |
+| [docs/threat-model.md](docs/threat-model.md) | T1–T19 attacks and controls |
 
 ⚠️ Read T1 first. An API key is a bearer credential.
 
@@ -143,6 +143,26 @@ A/B subject tests, engagement cohorts, revenue attribution hooks.
 ### Z — Zero-trust tenancy
 
 Row-level security on every table. No cross-tenant read path.
+
+---
+
+## Platform features
+
+Lifecycle and console features every serious ESP ships.
+
+| Feature | What it does |
+| --- | --- |
+| Sandbox mode | Full API, nothing actually delivered |
+| Template versioning | Draft, publish, roll back |
+| Undo send | Cancel window before dispatch |
+| Team roles | Owner, developer, viewer key scopes |
+| Retention controls | Per-tenant data expiry windows |
+| Inbox placement tests | Seed-list preview per provider |
+| Hosted DMARC and MTA-STS | We manage tenant policy DNS |
+| Spoof watch | Alert tenants when their domain is forged |
+| Webhook replay | Re-deliver missed events on demand |
+| Security alerts | New key, new domain, anomaly — instant notify |
+| Audit export | Stream admin log to tenant SIEM |
 
 ---
 
