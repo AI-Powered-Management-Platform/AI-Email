@@ -20,6 +20,7 @@ languages. See [docs/v1-scope.md](docs/v1-scope.md).
 | --- | --- |
 | [docs/v1-scope.md](docs/v1-scope.md) | What V1 ships, phases, exit criteria |
 | [docs/decisions.md](docs/decisions.md) | D1–D7, what would reverse them |
+| [docs/api-contract.md](docs/api-contract.md) | Send API, webhooks, error codes |
 | [SECURITY.md](SECURITY.md) | Hardening backlog, prioritised |
 | [docs/threat-model.md](docs/threat-model.md) | T1–T19 attacks and controls |
 
