@@ -17,6 +17,7 @@ import (
 
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/config"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/httpapi"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/store"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -70,9 +71,28 @@ func runServe() error {
 		return err
 	}
 
+	startupCtx, cancelStartup := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelStartup()
+
+	if err := store.Migrate(startupCtx, cfg.DatabaseURL); err != nil {
+		return err
+	}
+
+	db, err := store.Open(startupCtx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	schema, err := store.SchemaVersion(startupCtx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	log.Info("schema ready", "version", schema)
+
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpapi.New(cfg, log, version).Handler(),
+		Handler:           httpapi.New(cfg, log, db, version).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
