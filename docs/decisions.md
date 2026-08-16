@@ -6,7 +6,7 @@ what would reverse it. Scope and phases live in [v1-scope.md](v1-scope.md).
 | ID | Decision | Date |
 | --- | --- | --- |
 | D1 | Adopt a proven sending engine | 2026-08-16 |
-| D2 | No new languages in V1 | 2026-08-16 |
+| D2 | Server is written in Go | 2026-08-16 |
 | D3 | REST-only, no tenant SMTP submission | 2026-08-16 |
 | D4 | Transactional only, no bulk | 2026-08-16 |
 | D5 | We are tenant zero | 2026-08-16 |
@@ -38,23 +38,53 @@ write ours behind the same internal interface.
 
 ---
 
-## D2 — No new languages in V1
+## D2 — Server is written in Go
 
-| Layer | V1 |
+| Layer | Language |
 | --- | --- |
-| api, worker | Python |
-| console | TypeScript |
-| data | Postgres, Redis |
-| sending engine | Operated, not written |
+| `api`, `worker` | Go |
+| `console` | TypeScript, Next.js |
+| Data | Postgres, Redis |
+| Sending engine | Operated, not written (D1) |
 
-Go remains correct for hostile-protocol and credential-holding services. It is
-deferred, not dropped — see [v1-scope.md](v1-scope.md) for the triggers that
-introduce it.
+### Why it changed
 
-Every new language and service is permanent operational work. Each one must be
-forced by a limitation we have actually hit.
+This decision originally read "no new languages in V1" and put the server in
+Python. That reasoning assumed a single operator running a private service,
+where familiarity beat everything.
 
-**Reverses if:** a V2 trigger fires (tenant SMTP submission, key-custody gap).
+D8 changed the premise. Software meant to be self-hosted by strangers is
+judged on how easily a stranger runs it.
+
+| Go advantage | Effect |
+| --- | --- |
+| Single static binary | No runtime, no virtualenv, no version drift |
+| Cross-compilation | Every platform from one build |
+| Large standard library | Fewer dependencies to audit |
+| Memory safe with real concurrency | Correct for a mail server |
+| Familiar to infrastructure contributors | Mail tooling is mostly Go |
+
+A self-hostable mail service that ships as one binary will be adopted; one
+that ships as a Python application with an environment to reproduce will not.
+
+### Consequences accepted
+
+| Consequence | Detail |
+| --- | --- |
+| No AiERP patterns to reuse | Slower start, new CI, new toolchain |
+| MJML compile needs Node | Deferred; not in V1 scope |
+| AI features arrive as a sidecar | Python, spoken to over the network |
+
+### Consequences gained
+
+| Gain | Detail |
+| --- | --- |
+| Key custody is a package, not a service | The deferred signer may never be needed |
+| Template escaping is contextual by default | Narrows T11 |
+| One toolchain across every deferred service | Relay and MTA join without a new language |
+
+**Reverses if:** nothing foreseeable. Language choice is settled for the
+server. The console stays TypeScript — Go is not a user-interface language.
 
 ---
 
