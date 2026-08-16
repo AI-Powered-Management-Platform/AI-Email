@@ -12,6 +12,7 @@ what would reverse it. Scope and phases live in [v1-scope.md](v1-scope.md).
 | D5 | We are tenant zero | 2026-08-16 |
 | D6 | Resend stays as fallback | 2026-08-16 |
 | D7 | Sending nodes are rented and disposable | 2026-08-16 |
+| D8 | Distributed as an open-source project | 2026-08-16 |
 
 ---
 
@@ -133,3 +134,51 @@ permits outbound SMTP. Nodes are cattle; the IP reputation is the asset.
 | Reputation monitored daily | Damage is repairable in hours, not weeks |
 
 **Reverses if:** volume justifies owning address space.
+
+---
+
+## D8 — Distributed as an open-source project
+
+AI-Email is built to be run by anyone, not only by us. We are the first
+operator, not the only one.
+
+⚠️ **Licence is not yet chosen.** The repository is public but carries no
+LICENSE file, so today no one may legally use, modify, or contribute. Nothing
+below is real until a licence lands.
+
+### What this changes
+
+| Area | Requirement |
+| --- | --- |
+| Configuration | Self-configuring, nothing hardcoded to us |
+| Defaults | Safe out of the box, unsafe combinations refused |
+| Secrets | No working example keys, ever, anywhere |
+| Deployment | A stranger deploys it from the docs alone |
+| Releases | Semantic versions, changelog, upgrade notes |
+| Disclosure | Public policy and contact before v1.0 |
+| Contributions | Reviewed as hostile input, like any other |
+
+### Why this raises the security bar
+
+| Reality | Consequence |
+| --- | --- |
+| Attackers read the source | A weak default becomes a known exploit |
+| Operators misconfigure | Their bad sending reflects on the project |
+| Contributors submit code | Supply-chain risk arrives by pull request |
+| Issues are public | Vulnerability reports need a private channel |
+
+An ESP that others self-host multiplies the reputation surface: every careless
+deployment shapes how mailbox providers judge software that identifies itself
+as ours.
+
+### What stays ours
+
+| Ours | Detail |
+| --- | --- |
+| Our IPs and reputation | Never shared by a licence |
+| Our operated service | The product we sell |
+| Project name and marks | Trademark, not copyright |
+
+**Reverses if:** nothing. Publication is one-way — code released under a
+licence cannot be recalled from those who already have it. Choose carefully
+once, not quickly.

@@ -89,6 +89,27 @@ with mailbox-provider dashboards.
 
 ---
 
+## Open-source requirements
+
+V1 ships as software others can run (D8), so these are scope, not polish.
+
+| Requirement | Detail |
+| --- | --- |
+| Nothing hardcoded to us | Domains, URLs, keys all from config |
+| Safe defaults | Insecure combinations refused at startup |
+| No working example secrets | Placeholders only, validated as such |
+| One-command local run | Compose file, documented env vars |
+| Install and upgrade docs | A stranger succeeds without asking us |
+| Semantic versioning | Changelog and upgrade notes per release |
+| security.txt and disclosure policy | Live before any tagged release |
+| Contribution review discipline | Signed commits, dependency review |
+
+⚠️ Self-hosted operators inherit our threat model but not our judgement. Ship
+guardrails, not warnings — a config that could poison reputation must fail
+closed, not merely log a caution.
+
+---
+
 ## Exit criteria — when V1 is done
 
 | Criterion | Measure |
@@ -100,6 +121,7 @@ with mailbox-provider dashboards.
 | Unplanned sending outages | Zero in 30 days |
 | Security floor | All P0 shipped and tested |
 | Fallback proven | Switch to Resend drilled, not assumed |
+| Third party can deploy it | From docs alone, no help |
 
 ---
 
