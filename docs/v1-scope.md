@@ -9,6 +9,7 @@ Rationale in [decisions.md](decisions.md). Controls in [../SECURITY.md](../SECUR
 | Mail type | Transactional only |
 | Intake | REST API |
 | Volume target | Under 1,000 per day |
+| Server | One Go binary |
 | Engine | Operated, not written |
 
 ---
@@ -95,6 +96,8 @@ V1 ships as software others can run (D8), so these are scope, not polish.
 
 | Requirement | Detail |
 | --- | --- |
+| Single static binary | No runtime or interpreter to install |
+| Cross-compiled releases | Linux amd64 and arm64 at minimum |
 | Nothing hardcoded to us | Domains, URLs, keys all from config |
 | Safe defaults | Insecure combinations refused at startup |
 | No working example secrets | Placeholders only, validated as such |
@@ -132,7 +135,8 @@ Nothing below is scheduled. Each waits for its trigger.
 | Add | Trigger |
 | --- | --- |
 | Go relay | A tenant requires SMTP submission |
-| Go signer service | Engine signing cannot meet D1 key custody |
+| Separate signer service | Key custody needs its own trust boundary |
+| Python AI sidecar | Send path stable and boring |
 | Our own MTA | The engine limits us at real volume |
 | AI features | Send path stable and boring |
 | Bulk sending | T4 and T9 controls shipped |

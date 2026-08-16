@@ -3,13 +3,13 @@
 AI-assisted Email Service Provider. Sends transactional and bulk email, owns its
 sending IPs and reputation, and protects deliverability instead of renting it.
 
-V1 is deliberately smaller: our own transactional mail, one tenant, no new
-languages. See [docs/v1-scope.md](docs/v1-scope.md).
+V1 is deliberately smaller: our own transactional mail, one tenant, one binary.
+See [docs/v1-scope.md](docs/v1-scope.md).
 
 | Item | Value |
 | --- | --- |
 | Sending engine | Operated, not written |
-| Control plane | Python / FastAPI |
+| Control plane | Go, single binary |
 | Console | Next.js |
 | Queue | Redis + Postgres |
 | Status | V1 scoped, build starting |
@@ -31,18 +31,20 @@ languages. See [docs/v1-scope.md](docs/v1-scope.md).
 
 ## Architecture
 
-V1 runs a proven sending engine and adds no new languages. Go services are
-deferred until a trigger forces them — see [docs/decisions.md](docs/decisions.md).
+V1 ships one Go binary plus a proven sending engine. Everything else is
+deferred until a trigger forces it — see [docs/decisions.md](docs/decisions.md).
 
 | Service | Language | Job | V1 |
 | --- | --- | --- | --- |
+| `aiemail` | Go | REST, templates, keys, events | ✅ |
 | `engine` | operated | SMTP out, retry, throttle | ✅ |
-| `api` | Python | REST, tenants, templates | ✅ |
-| `worker` | Python | Bounces, webhooks, reports | ✅ |
 | `console` | TypeScript | Vendor dashboard | ✅ |
 | `relay` | Go | SMTP in, auth, accept | ⬜ deferred |
 | `mta` | Go | Our own queue engine | ⬜ deferred |
-| `signer` | Go | DKIM key custody | ⬜ deferred |
+| `ai` | Python | Scoring and content sidecar | ⬜ deferred |
+
+⚠️ `api` and `worker` are one binary with two run modes, not two deployments.
+Self-hosters should need one process to start.
 
 The features below describe the target product. V1 ships the subset in
 [docs/v1-scope.md](docs/v1-scope.md).
