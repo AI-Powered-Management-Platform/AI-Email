@@ -19,10 +19,11 @@ languages. See [docs/v1-scope.md](docs/v1-scope.md).
 | Document | Contents |
 | --- | --- |
 | [docs/v1-scope.md](docs/v1-scope.md) | What V1 ships, phases, exit criteria |
-| [docs/decisions.md](docs/decisions.md) | D1–D7, what would reverse them |
+| [docs/decisions.md](docs/decisions.md) | D1–D8, what would reverse them |
 | [docs/api-contract.md](docs/api-contract.md) | Send API, webhooks, error codes |
-| [SECURITY.md](SECURITY.md) | Hardening backlog, prioritised |
+| [SECURITY.md](SECURITY.md) | Reporting flaws, hardening backlog |
 | [docs/threat-model.md](docs/threat-model.md) | T1–T19 attacks and controls |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Sign-off, review rules, what we reject |
 
 ⚠️ Read T1 first. An API key is a bearer credential.
 
@@ -235,6 +236,22 @@ our mail must pass; see [SECURITY.md](SECURITY.md) section 3.
 
 Our customers are the businesses that outgrew Gmail SMTP and want more than
 rented pipes.
+
+---
+
+## Licence
+
+AGPL-3.0 — see [LICENSE](LICENSE). Run it, modify it, host it. If you offer a
+modified version as a network service, publish your changes.
+
+| Item | Licence |
+| --- | --- |
+| This repository | AGPL-3.0 |
+| Future client SDKs | Apache-2.0 |
+| Contributions | AGPL-3.0, DCO sign-off |
+
+Reasoning in [D8](docs/decisions.md). Support is best-effort; this is not a
+funded product team.
 
 ---
 

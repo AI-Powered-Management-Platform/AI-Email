@@ -1,4 +1,36 @@
-# AI-Email — security hardening backlog
+# AI-Email — security policy and hardening backlog
+
+## Reporting a vulnerability
+
+⚠️ **Never report a security flaw in a public issue or pull request.**
+
+| Step | Detail |
+| --- | --- |
+| Channel | GitHub → Security tab → Report a vulnerability |
+| Include | Version, configuration, reproduction steps |
+| Acknowledgement | We aim to reply within 3 working days |
+| Disclosure | Coordinated; we will agree a date with you |
+| Credit | Offered by default, declined on request |
+
+Safe harbour: we will not pursue researchers who act in good faith, stay
+within their own deployment, avoid privacy violations and service disruption,
+and give us reasonable time to fix the issue before disclosing.
+
+⚠️ Do not test against our production sending infrastructure. Deploy your own
+instance — that is what the licence is for.
+
+### Out of scope
+
+| Not a vulnerability | Reason |
+| --- | --- |
+| Missing hardening in a self-hosted deploy | Configure it; see below |
+| Reports from automated scanners only | Reproduce it first |
+| Unfixed OS package CVEs in base images | Report upstream |
+| Social engineering of operators | Not a software defect |
+
+---
+
+## Hardening backlog
 
 Researched 2026-07-30 against current standards, live attacks, and mailbox
 provider rules. Extended 2026-08-15 with sections 9–17 mapping threats

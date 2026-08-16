@@ -142,9 +142,28 @@ permits outbound SMTP. Nodes are cattle; the IP reputation is the asset.
 AI-Email is built to be run by anyone, not only by us. We are the first
 operator, not the only one.
 
-⚠️ **Licence is not yet chosen.** The repository is public but carries no
-LICENSE file, so today no one may legally use, modify, or contribute. Nothing
-below is real until a licence lands.
+| Component | Licence |
+| --- | --- |
+| Server, console, this repository | AGPL-3.0 |
+| Future client SDKs | Apache-2.0 |
+| Contributions | AGPL-3.0, DCO sign-off |
+
+AGPL was chosen because our moat is IPs, reputation, and provider
+relationships — not source code. We can afford real openness. What AGPL
+prevents is a funded competitor hosting our work and returning nothing.
+
+Client SDKs stay permissive because nobody integrates against a copyleft
+library.
+
+⚠️ **AGPL section 13 binds us too.** Anyone using our hosted service may
+demand the corresponding source of the version they used. Publishing a tagged
+release for every deployed version is an operating requirement, not a
+courtesy.
+
+⚠️ Contributions are taken under DCO, not a contributor agreement, so
+contributors keep their copyright. Dual-licensing later would need every
+contributor's permission — accepted deliberately, in exchange for lower
+friction now.
 
 ### What this changes
 
