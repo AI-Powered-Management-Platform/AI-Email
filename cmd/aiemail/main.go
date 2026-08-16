@@ -44,6 +44,16 @@ func run() error {
 		return runServe()
 	case "worker":
 		return runWorker()
+	case "keys":
+		if len(os.Args) > 2 && os.Args[2] == "create" {
+			return runCreateKey(os.Args[3:])
+		}
+		return fmt.Errorf("usage: aiemail keys create -name NAME")
+	case "domains":
+		if len(os.Args) > 2 && os.Args[2] == "add" {
+			return runAddDomain(os.Args[3:])
+		}
+		return fmt.Errorf("usage: aiemail domains add -name DOMAIN")
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -57,9 +67,11 @@ func usage() {
 	fmt.Fprint(os.Stderr, `aiemail — AI-Email server
 
 Usage:
-  aiemail serve     Serve the REST API
-  aiemail worker    Run background delivery and event work
-  aiemail version   Print the build version
+  aiemail serve          Serve the REST API
+  aiemail worker         Run background delivery and event work
+  aiemail keys create    Issue an API key (shown once)
+  aiemail domains add    Register a sending domain
+  aiemail version        Print the build version
 
 Configuration comes from the environment; see docs/.
 `)
@@ -92,7 +104,7 @@ func runServe() error {
 
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpapi.New(cfg, log, db, version).Handler(),
+		Handler:           httpapi.New(cfg, log, db, db, db, version).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
