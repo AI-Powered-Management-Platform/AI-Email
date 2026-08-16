@@ -77,16 +77,24 @@ flood cannot flood if the ceiling holds.
 | # | Phase | Exit condition |
 | --- | --- | --- |
 | 0 | Contracts and module docs | API contract agreed |
-| 1 | Node, DNS, DKIM, rDNS | Test mail authenticates |
-| 2 | Send path, keys, queue | Idempotent send, crash-safe |
-| 3 | Events, bounces, suppression | AiERP receives webhooks |
-| 4 | Console | Keys and logs usable |
-| 5 | Security floor closeout | Every P0 above green |
-| 6 | Kratos courier swap | Auth mail flows through us |
+| 1 | Send path, keys, queue | Idempotent send, crash-safe |
+| 2 | Events, bounces, suppression | Webhooks delivered and verified |
+| 3 | Console | Keys and logs usable |
+| 4 | Security floor closeout | Every P0 above green |
+| 5 | Node, DNS, DKIM, rDNS | Test mail authenticates |
+| 6 | First real sends | Auth mail flows through us |
 | 7 | Warmup ramp | Volume rises on schedule |
 
-Phase 1 depends on owner actions: renting the node, publishing DNS, registering
-with mailbox-provider dashboards.
+⚠️ Phases 1–4 need no sending node and no internet delivery. Build against a
+local mail sink that captures everything. Retry rules, crash-safety, and
+smuggling tests are more reliable offline anyway — deterministic and free.
+
+The node is procured at phase 5, not before, because the security floor gates
+every external send. Buying it earlier only starts paying for an idle machine.
+
+⚠️ Warmup cannot begin until phase 5 exists, and it is calendar time, not work.
+Plan the node purchase to land as phase 4 closes, so the ramp starts the day
+sending is permitted.
 
 ---
 
@@ -147,7 +155,20 @@ Nothing below is scheduled. Each waits for its trigger.
 
 | Constraint | Effect |
 | --- | --- |
-| Port 25 blocked on DigitalOcean | Sending nodes live elsewhere |
+| Port 25 blocked at many hosts | Check before renting a node |
 | Warmup is calendar time | Weeks; no engineering shortcut |
 | Reputation damage is not revertible | Deploys fix code, not trust |
 | One operator | Every service is permanent work |
+
+### Where a sending node may not live
+
+| Unsuitable | Reason |
+| --- | --- |
+| Home or office ISP connection | Residential ranges are blocked by policy |
+| Any address without settable rDNS | Receivers check PTR first |
+| An IP with blocklist history | You inherit the previous owner's sins |
+| A changing address | Reputation is tied to the IP |
+
+⚠️ Mailbox providers reject residential-range mail **before** examining
+authentication. Perfect SPF, DKIM, and DMARC do not overcome a policy listing,
+so warmup on such an address builds nothing.
