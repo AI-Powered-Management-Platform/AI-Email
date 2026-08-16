@@ -16,6 +16,12 @@ dist/
 build/
 bin/
 vendor/
+
+# Go
+*.exe
+*.test
+*.out
+/aiemail
 coverage/
 .DS_Store
 Thumbs.db
