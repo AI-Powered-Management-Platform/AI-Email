@@ -1,22 +1,29 @@
 # AI-Email
 
 AI-assisted Email Service Provider. Sends transactional and bulk email, owns its
-own MTA queue, and protects deliverability instead of renting it.
+sending IPs and reputation, and protects deliverability instead of renting it.
+
+V1 is deliberately smaller: our own transactional mail, one tenant, no new
+languages. See [docs/v1-scope.md](docs/v1-scope.md).
 
 | Item | Value |
 | --- | --- |
-| Sending engine | Go |
+| Sending engine | Operated, not written |
 | Control plane | Python / FastAPI |
 | Console | Next.js |
 | Queue | Redis + Postgres |
-| Status | Design stage |
+| Status | V1 scoped, build starting |
 
 ⚠️ Port 25 is blocked on DigitalOcean. Sending nodes must run elsewhere.
 
 | Document | Contents |
 | --- | --- |
-| [SECURITY.md](SECURITY.md) | Hardening backlog, prioritised |
+| [docs/v1-scope.md](docs/v1-scope.md) | What V1 ships, phases, exit criteria |
+| [docs/decisions.md](docs/decisions.md) | D1–D8, what would reverse them |
+| [docs/api-contract.md](docs/api-contract.md) | Send API, webhooks, error codes |
+| [SECURITY.md](SECURITY.md) | Reporting flaws, hardening backlog |
 | [docs/threat-model.md](docs/threat-model.md) | T1–T19 attacks and controls |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Sign-off, review rules, what we reject |
 
 ⚠️ Read T1 first. An API key is a bearer credential.
 
@@ -24,13 +31,21 @@ own MTA queue, and protects deliverability instead of renting it.
 
 ## Architecture
 
-| Service | Language | Job |
-| --- | --- | --- |
-| `mta` | Go | SMTP out, retry, throttle |
-| `relay` | Go | SMTP in, auth, accept |
-| `api` | Python | REST, tenants, templates |
-| `worker` | Python | Bounces, webhooks, reports |
-| `console` | TypeScript | Vendor dashboard |
+V1 runs a proven sending engine and adds no new languages. Go services are
+deferred until a trigger forces them — see [docs/decisions.md](docs/decisions.md).
+
+| Service | Language | Job | V1 |
+| --- | --- | --- | --- |
+| `engine` | operated | SMTP out, retry, throttle | ✅ |
+| `api` | Python | REST, tenants, templates | ✅ |
+| `worker` | Python | Bounces, webhooks, reports | ✅ |
+| `console` | TypeScript | Vendor dashboard | ✅ |
+| `relay` | Go | SMTP in, auth, accept | ⬜ deferred |
+| `mta` | Go | Our own queue engine | ⬜ deferred |
+| `signer` | Go | DKIM key custody | ⬜ deferred |
+
+The features below describe the target product. V1 ships the subset in
+[docs/v1-scope.md](docs/v1-scope.md).
 
 ---
 
@@ -221,6 +236,22 @@ our mail must pass; see [SECURITY.md](SECURITY.md) section 3.
 
 Our customers are the businesses that outgrew Gmail SMTP and want more than
 rented pipes.
+
+---
+
+## Licence
+
+AGPL-3.0 — see [LICENSE](LICENSE). Run it, modify it, host it. If you offer a
+modified version as a network service, publish your changes.
+
+| Item | Licence |
+| --- | --- |
+| This repository | AGPL-3.0 |
+| Future client SDKs | Apache-2.0 |
+| Contributions | AGPL-3.0, DCO sign-off |
+
+Reasoning in [D8](docs/decisions.md). Support is best-effort; this is not a
+funded product team.
 
 ---
 
