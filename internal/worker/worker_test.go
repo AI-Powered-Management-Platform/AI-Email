@@ -349,12 +349,12 @@ func TestLifecycleEventsAreQueuedForWebhooks(t *testing.T) {
 func TestEventIDsAreStableAcrossRetries(t *testing.T) {
 	first := &fakeEvents{}
 	q1 := newFakeQueue(msg("m1", 3))
-	New(q1, &fakeSender{response: delivery.Response{Result: delivery.Sent}}, &fakeKeys{}, fakeSigner{}, first, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), 0).
+	_ = New(q1, &fakeSender{response: delivery.Response{Result: delivery.Sent}}, &fakeKeys{}, fakeSigner{}, first, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), 0).
 		tick(context.Background())
 
 	second := &fakeEvents{}
 	q2 := newFakeQueue(msg("m1", 3))
-	New(q2, &fakeSender{response: delivery.Response{Result: delivery.Sent}}, &fakeKeys{}, fakeSigner{}, second, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), 0).
+	_ = New(q2, &fakeSender{response: delivery.Response{Result: delivery.Sent}}, &fakeKeys{}, fakeSigner{}, second, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), 0).
 		tick(context.Background())
 
 	if first.enqueued[0] != second.enqueued[0] {

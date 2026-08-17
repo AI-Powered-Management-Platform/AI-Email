@@ -82,7 +82,7 @@ func TestDeliveredRequestCarriesAVerifiableSignature(t *testing.T) {
 	if err != nil {
 		t.Fatalf("posting: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if verifyErr != nil {
 		t.Fatalf("receiver could not verify the signature: %v", verifyErr)

@@ -88,7 +88,7 @@ func (e *Engine) Send(ctx context.Context, msg Message) Response {
 		// is always temporary.
 		return Response{Temporary, fmt.Sprintf("engine unreachable: %v", err)}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	switch {
 	case resp.StatusCode >= 200 && resp.StatusCode < 300:

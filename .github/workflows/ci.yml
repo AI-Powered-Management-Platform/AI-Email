@@ -90,7 +90,10 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
           govulncheck ./...
+      # The gitleaks CLI is MIT-licensed; the marketplace action wrapper needs
+      # a paid licence for organization repos, so we run the binary directly,
+      # pinned like every other scanner. --redact keeps any hit out of CI logs.
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          gitleaks git --redact --no-banner
