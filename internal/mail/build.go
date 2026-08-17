@@ -25,6 +25,11 @@ type Envelope struct {
 	ReplyTo   string
 	Extra     map[string]string
 	Date      time.Time
+
+	// UnsubscribeURL adds the RFC 8058 header pair. Mailbox providers expect a
+	// one-click option on bulk mail, and both headers are signed so neither can
+	// be added or altered after the fact.
+	UnsubscribeURL string
 }
 
 func Build(e Envelope) ([]byte, error) {
@@ -73,6 +78,14 @@ func Build(e Envelope) ([]byte, error) {
 	}
 	if err := write("MIME-Version", "1.0"); err != nil {
 		return nil, err
+	}
+	if e.UnsubscribeURL != "" {
+		if err := write("List-Unsubscribe", "<"+e.UnsubscribeURL+">"); err != nil {
+			return nil, err
+		}
+		if err := write("List-Unsubscribe-Post", "List-Unsubscribe=One-Click"); err != nil {
+			return nil, err
+		}
 	}
 	for name, value := range e.Extra {
 		if err := ValidateCustomHeader(name, value); err != nil {

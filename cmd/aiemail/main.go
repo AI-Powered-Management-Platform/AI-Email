@@ -23,6 +23,7 @@ import (
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dnsverify"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/httpapi"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/store"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/unsubscribe"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/webhook"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/worker"
 )
@@ -222,7 +223,7 @@ func runWorker() error {
 		return err
 	}
 
-	run("delivery", worker.New(db, delivery.NewEngine(cfg.EngineURL), db, dkim.NewSigner(keeper), db, db, log, cfg.MaxSendPerHour).Run)
+	run("delivery", worker.New(db, delivery.NewEngine(cfg.EngineURL), db, dkim.NewSigner(keeper), db, db, unsubscribe.DeriveSecret(cfg.DKIMMasterKey), cfg.PublicBaseURL, log, cfg.MaxSendPerHour).Run)
 	run("webhooks", worker.NewDispatcher(db, webhook.NewSender(20*time.Second), log).Run)
 	run("domains", worker.NewDomainChecker(db, dnsverify.New(nil, 10*time.Second), log).Run)
 

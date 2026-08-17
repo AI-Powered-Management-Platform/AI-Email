@@ -154,7 +154,7 @@ func (f *fakeSuppressor) Suppress(_ context.Context, address, reason, _, _ strin
 // newWorker wires a worker with working signing, so each test states only what
 // it cares about.
 func newWorker(q Queue, s Sender, maxPerHour int) *Worker {
-	return New(q, s, &fakeKeys{}, fakeSigner{}, &fakeEvents{}, newFakeSuppressor(), quietLogger(), maxPerHour)
+	return New(q, s, &fakeKeys{}, fakeSigner{}, &fakeEvents{}, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), maxPerHour)
 }
 
 func msg(id string, attempts int) store.Claimed {
@@ -261,7 +261,7 @@ func TestCeilingOfZeroMeansNoCeilingCheck(t *testing.T) {
 func TestMessageThatCannotBeSignedIsNeverSent(t *testing.T) {
 	q := newFakeQueue(msg("m1", 1))
 	s := &fakeSender{response: delivery.Response{Result: delivery.Sent}}
-	w := New(q, s, &fakeKeys{err: errors.New("no key for domain")}, fakeSigner{}, &fakeEvents{}, newFakeSuppressor(), quietLogger(), 0)
+	w := New(q, s, &fakeKeys{err: errors.New("no key for domain")}, fakeSigner{}, &fakeEvents{}, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), 0)
 
 	if _, err := w.tick(context.Background()); err != nil {
 		t.Fatalf("tick: %v", err)
@@ -277,7 +277,7 @@ func TestMessageThatCannotBeSignedIsNeverSent(t *testing.T) {
 func TestSigningFailureAlsoStopsDelivery(t *testing.T) {
 	q := newFakeQueue(msg("m1", 1))
 	s := &fakeSender{response: delivery.Response{Result: delivery.Sent}}
-	w := New(q, s, &fakeKeys{}, fakeSigner{err: errors.New("key unwrap failed")}, &fakeEvents{}, newFakeSuppressor(), quietLogger(), 0)
+	w := New(q, s, &fakeKeys{}, fakeSigner{err: errors.New("key unwrap failed")}, &fakeEvents{}, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), 0)
 
 	if _, err := w.tick(context.Background()); err != nil {
 		t.Fatalf("tick: %v", err)
@@ -291,7 +291,7 @@ func TestSignedMessageIsWhatGetsHandedToTheEngine(t *testing.T) {
 	q := newFakeQueue(msg("m1", 1))
 	var captured delivery.Message
 	s := &capturingSender{response: delivery.Response{Result: delivery.Sent}, capture: &captured}
-	w := New(q, s, &fakeKeys{}, fakeSigner{}, &fakeEvents{}, newFakeSuppressor(), quietLogger(), 0)
+	w := New(q, s, &fakeKeys{}, fakeSigner{}, &fakeEvents{}, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), 0)
 
 	if _, err := w.tick(context.Background()); err != nil {
 		t.Fatalf("tick: %v", err)
@@ -330,7 +330,7 @@ func TestLifecycleEventsAreQueuedForWebhooks(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			q := newFakeQueue(msg("m1", 1))
 			events := &fakeEvents{}
-			w := New(q, &fakeSender{response: tc.response}, &fakeKeys{}, fakeSigner{}, events, newFakeSuppressor(), quietLogger(), 0)
+			w := New(q, &fakeSender{response: tc.response}, &fakeKeys{}, fakeSigner{}, events, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), 0)
 
 			if _, err := w.tick(context.Background()); err != nil {
 				t.Fatalf("tick: %v", err)
@@ -349,12 +349,12 @@ func TestLifecycleEventsAreQueuedForWebhooks(t *testing.T) {
 func TestEventIDsAreStableAcrossRetries(t *testing.T) {
 	first := &fakeEvents{}
 	q1 := newFakeQueue(msg("m1", 3))
-	New(q1, &fakeSender{response: delivery.Response{Result: delivery.Sent}}, &fakeKeys{}, fakeSigner{}, first, newFakeSuppressor(), quietLogger(), 0).
+	New(q1, &fakeSender{response: delivery.Response{Result: delivery.Sent}}, &fakeKeys{}, fakeSigner{}, first, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), 0).
 		tick(context.Background())
 
 	second := &fakeEvents{}
 	q2 := newFakeQueue(msg("m1", 3))
-	New(q2, &fakeSender{response: delivery.Response{Result: delivery.Sent}}, &fakeKeys{}, fakeSigner{}, second, newFakeSuppressor(), quietLogger(), 0).
+	New(q2, &fakeSender{response: delivery.Response{Result: delivery.Sent}}, &fakeKeys{}, fakeSigner{}, second, newFakeSuppressor(), []byte("test-secret"), "", quietLogger(), 0).
 		tick(context.Background())
 
 	if first.enqueued[0] != second.enqueued[0] {
@@ -382,7 +382,7 @@ func TestOnlyBadAddressesAreSuppressed(t *testing.T) {
 			q := newFakeQueue(msg("m1", 1))
 			sup := newFakeSuppressor()
 			s := &fakeSender{response: delivery.Response{Result: delivery.Permanent, Reason: tc.reason}}
-			w := New(q, s, &fakeKeys{}, fakeSigner{}, &fakeEvents{}, sup, quietLogger(), 0)
+			w := New(q, s, &fakeKeys{}, fakeSigner{}, &fakeEvents{}, sup, []byte("test-secret"), "", quietLogger(), 0)
 
 			if _, err := w.tick(context.Background()); err != nil {
 				t.Fatalf("tick: %v", err)
@@ -406,7 +406,7 @@ func TestTemporaryFailuresNeverSuppress(t *testing.T) {
 	q := newFakeQueue(msg("m1", 1))
 	sup := newFakeSuppressor()
 	s := &fakeSender{response: delivery.Response{Result: delivery.Temporary, Reason: "550 5.1.1 user unknown"}}
-	w := New(q, s, &fakeKeys{}, fakeSigner{}, &fakeEvents{}, sup, quietLogger(), 0)
+	w := New(q, s, &fakeKeys{}, fakeSigner{}, &fakeEvents{}, sup, []byte("test-secret"), "", quietLogger(), 0)
 
 	if _, err := w.tick(context.Background()); err != nil {
 		t.Fatalf("tick: %v", err)

@@ -19,6 +19,7 @@ import (
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dkim"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/mail"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/store"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/unsubscribe"
 )
 
 const (
@@ -66,26 +67,30 @@ type MessageSigner interface {
 }
 
 type Worker struct {
-	queue        Queue
-	sender       Sender
-	keys         KeyStore
-	signer       MessageSigner
-	events       EventPublisher
-	suppressions Suppressor
-	log          *slog.Logger
-	maxPerHour   int
+	queue             Queue
+	sender            Sender
+	keys              KeyStore
+	signer            MessageSigner
+	events            EventPublisher
+	suppressions      Suppressor
+	unsubscribeSecret []byte
+	publicBaseURL     string
+	log               *slog.Logger
+	maxPerHour        int
 }
 
-func New(queue Queue, sender Sender, keys KeyStore, signer MessageSigner, events EventPublisher, suppressions Suppressor, log *slog.Logger, maxPerHour int) *Worker {
+func New(queue Queue, sender Sender, keys KeyStore, signer MessageSigner, events EventPublisher, suppressions Suppressor, unsubscribeSecret []byte, publicBaseURL string, log *slog.Logger, maxPerHour int) *Worker {
 	return &Worker{
-		queue:        queue,
-		sender:       sender,
-		keys:         keys,
-		signer:       signer,
-		events:       events,
-		suppressions: suppressions,
-		log:          log,
-		maxPerHour:   maxPerHour,
+		queue:             queue,
+		sender:            sender,
+		keys:              keys,
+		signer:            signer,
+		events:            events,
+		suppressions:      suppressions,
+		unsubscribeSecret: unsubscribeSecret,
+		publicBaseURL:     publicBaseURL,
+		log:               log,
+		maxPerHour:        maxPerHour,
 	}
 }
 
@@ -257,14 +262,25 @@ func (w *Worker) sign(ctx context.Context, msg store.Claimed) ([]byte, error) {
 		return nil, fmt.Errorf("no active signing key for this domain: %w", err)
 	}
 
+	// One-click unsubscribe is offered only when a public address is
+	// configured, because a link nobody can reach is worse than no link: it
+	// tells a provider we support unsubscribing when we do not. The token is
+	// bound to the first recipient, which is the person the link belongs to.
+	var unsubscribeURL string
+	if w.publicBaseURL != "" && len(msg.Recipients) > 0 {
+		token := unsubscribe.Sign(w.unsubscribeSecret, msg.ID, msg.Recipients[0], time.Now())
+		unsubscribeURL = unsubscribe.Link(w.publicBaseURL, token)
+	}
+
 	raw, err := mail.Build(mail.Envelope{
-		MessageID: msg.ID + "@" + key.Domain,
-		From:      msg.FromAddress,
-		To:        msg.Recipients,
-		Subject:   msg.Subject,
-		HTML:      msg.BodyHTML,
-		Text:      msg.BodyText,
-		Extra:     decodeHeaders(msg.Headers),
+		MessageID:      msg.ID + "@" + key.Domain,
+		From:           msg.FromAddress,
+		To:             msg.Recipients,
+		Subject:        msg.Subject,
+		HTML:           msg.BodyHTML,
+		Text:           msg.BodyText,
+		Extra:          decodeHeaders(msg.Headers),
+		UnsubscribeURL: unsubscribeURL,
 	})
 	if err != nil {
 		return nil, err
