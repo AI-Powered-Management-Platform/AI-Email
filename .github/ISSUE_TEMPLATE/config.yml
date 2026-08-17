@@ -1,0 +1,7 @@
+# Structured issue forms only (A3: agents triage issues; free-form text is
+# a wider injection surface and a worse bug report at the same time).
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/AI-Powered-Management-Platform/AI-Email/security/advisories/new
+    about: Never report security flaws in public issues. Use the private channel — see SECURITY.md.

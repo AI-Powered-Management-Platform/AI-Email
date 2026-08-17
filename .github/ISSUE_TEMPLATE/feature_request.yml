@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose new behaviour
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check `docs/v1-scope.md` first — deferred features return on their
+        written trigger, and a request that matches a deferral is a discussion
+        about the trigger, not a new feature.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you cannot do today, concretely.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Including "do nothing" — why is that not acceptable?
