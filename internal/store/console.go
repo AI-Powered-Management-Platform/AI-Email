@@ -96,7 +96,8 @@ type MessageRow struct {
 
 func (s *Store) ListMessages(ctx context.Context, status string, limit int) ([]MessageRow, error) {
 	const q = `
-		SELECT id, status, from_address, recipients, subject, attempts, last_error, signed_at, created_at
+		SELECT id, status, from_address, recipients, recipients_encrypted, subject,
+		       attempts, last_error, signed_at, created_at
 		FROM messages
 		WHERE ($1 = '' OR status = $1)
 		ORDER BY created_at DESC
@@ -111,9 +112,14 @@ func (s *Store) ListMessages(ctx context.Context, status string, limit int) ([]M
 	var out []MessageRow
 	for rows.Next() {
 		var m MessageRow
-		if err := rows.Scan(&m.ID, &m.Status, &m.From, &m.Recipients, &m.Subject,
+		var clear []string
+		var encrypted []byte
+		if err := rows.Scan(&m.ID, &m.Status, &m.From, &clear, &encrypted, &m.Subject,
 			&m.Attempts, &m.LastError, &m.SignedAt, &m.CreatedAt); err != nil {
 			return nil, fmt.Errorf("reading message: %w", err)
+		}
+		if m.Recipients, err = s.unpackRecipients(encrypted, clear); err != nil {
+			return nil, err
 		}
 		out = append(out, m)
 	}

@@ -82,7 +82,7 @@ func (s *Store) EnqueueMessage(ctx context.Context, in NewMessage) (*Message, bo
 		}
 	}
 
-	msg, err := insertMessage(ctx, tx, in)
+	msg, err := s.insertMessage(ctx, tx, in)
 	if err != nil {
 		return nil, false, err
 	}
@@ -139,16 +139,23 @@ func claimIdempotency(ctx context.Context, tx pgx.Tx, in NewMessage) (*Message, 
 	return &Message{ID: *id, Status: *status, CreatedAt: *createdAt}, true, nil
 }
 
-func insertMessage(ctx context.Context, tx pgx.Tx, in NewMessage) (*Message, error) {
+func (s *Store) insertMessage(ctx context.Context, tx pgx.Tx, in NewMessage) (*Message, error) {
+	encrypted, hashes, clear, err := s.packRecipients(in.Recipients)
+	if err != nil {
+		return nil, err
+	}
+
 	const q = `
-		INSERT INTO messages (id, api_key_id, domain_id, from_address, recipients, subject,
+		INSERT INTO messages (id, api_key_id, domain_id, from_address, recipients,
+		                      recipients_encrypted, recipients_hash, subject,
 		                      body_html, body_text, headers, tags, scheduled_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING id, status, created_at`
 
 	var m Message
-	err := tx.QueryRow(ctx, q,
-		in.ID, in.APIKeyID, in.DomainID, in.FromAddress, in.Recipients, in.Subject,
+	err = tx.QueryRow(ctx, q,
+		in.ID, in.APIKeyID, in.DomainID, in.FromAddress, clear,
+		encrypted, hashes, in.Subject,
 		in.BodyHTML, in.BodyText, in.Headers, in.Tags, in.ScheduledAt,
 	).Scan(&m.ID, &m.Status, &m.CreatedAt)
 	if err != nil {

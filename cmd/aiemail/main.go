@@ -18,6 +18,7 @@ import (
 
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/config"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/console"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/crypto"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/delivery"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dkim"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dnsverify"
@@ -115,6 +116,10 @@ func runServe() error {
 		return err
 	}
 	defer db.Close()
+
+	if err := attachKeeper(db, cfg.DKIMMasterKey); err != nil {
+		return err
+	}
 
 	schema, err := store.SchemaVersion(startupCtx, cfg.DatabaseURL)
 	if err != nil {
@@ -218,6 +223,12 @@ func runWorker() error {
 		}()
 	}
 
+	// Without this the worker cannot read the recipients it is meant to send
+	// to, because they are encrypted at rest.
+	if err := attachKeeper(db, cfg.DKIMMasterKey); err != nil {
+		return err
+	}
+
 	keeper, err := dkim.NewEnvelopeKeeper(cfg.DKIMMasterKey)
 	if err != nil {
 		return err
@@ -228,6 +239,21 @@ func runWorker() error {
 	run("domains", worker.NewDomainChecker(db, dnsverify.New(nil, 10*time.Second), log).Run)
 
 	wg.Wait()
+	return nil
+}
+
+// attachKeeper turns on envelope encryption for personal data when a master
+// key is configured. Sending requires one, so any deployment that can send
+// also encrypts recipients at rest.
+func attachKeeper(db *store.Store, masterKey []byte) error {
+	if len(masterKey) == 0 {
+		return nil
+	}
+	envelope, err := crypto.NewEnvelope(masterKey)
+	if err != nil {
+		return err
+	}
+	db.UseKeeper(envelope)
 	return nil
 }
 
