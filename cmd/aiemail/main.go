@@ -12,13 +12,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/config"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/delivery"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dnsverify"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/httpapi"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/store"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/webhook"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/worker"
 )
 
@@ -165,8 +168,25 @@ func runWorker() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	w := worker.New(db, delivery.NewEngine(cfg.EngineURL), log, cfg.MaxSendPerHour)
-	return w.Run(ctx)
+	// Three independent loops. A stuck webhook endpoint must not hold up mail,
+	// and a DNS outage must not hold up either.
+	var wg sync.WaitGroup
+	run := func(name string, fn func(context.Context) error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(ctx); err != nil {
+				log.Error(name+" stopped with an error", "error", err)
+			}
+		}()
+	}
+
+	run("delivery", worker.New(db, delivery.NewEngine(cfg.EngineURL), log, cfg.MaxSendPerHour).Run)
+	run("webhooks", worker.NewDispatcher(db, webhook.NewSender(20*time.Second), log).Run)
+	run("domains", worker.NewDomainChecker(db, dnsverify.New(nil, 10*time.Second), log).Run)
+
+	wg.Wait()
+	return nil
 }
 
 func boot() (*config.Config, *slog.Logger, error) {
