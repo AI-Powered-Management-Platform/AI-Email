@@ -44,6 +44,16 @@ type Config struct {
 	// plaintext signing key in the database is the worst secret we could hold.
 	DKIMMasterKey []byte
 
+	// ConsolePasswordHash enables the operator console. Absent, the console is
+	// not served at all: an interface that manages sending credentials should
+	// not exist without a way to protect it.
+	ConsolePasswordHash string
+
+	// ConsoleSecureCookies marks the session cookie Secure. It follows the
+	// environment so local development over http still works while production
+	// never sends the cookie in clear.
+	ConsoleSecureCookies bool
+
 	ShutdownGrace time.Duration
 }
 
@@ -92,6 +102,9 @@ func Load() (*Config, error) {
 			cfg.DKIMMasterKey = key
 		}
 	}
+
+	cfg.ConsolePasswordHash = strings.TrimSpace(os.Getenv("AIEMAIL_CONSOLE_PASSWORD_HASH"))
+	cfg.ConsoleSecureCookies = cfg.Env == EnvProduction
 
 	problems = append(problems, cfg.validate()...)
 	if len(problems) > 0 {

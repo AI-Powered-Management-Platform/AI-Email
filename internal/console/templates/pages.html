@@ -1,0 +1,133 @@
+{{define "login"}}
+{{template "layout" .}}
+{{end}}
+
+{{define "page-login"}}
+<div class="login">
+  <h1>Sign in</h1>
+  {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+  <form method="post" action="/console/login">
+    <label for="password">Console password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" autofocus>
+    <button type="submit">Sign in</button>
+  </form>
+</div>
+{{end}}
+
+{{define "page-overview"}}
+<h1>Overview</h1>
+<div class="cards">
+  <div class="card"><div class="n">{{.Counts.Queued}}</div><div class="l">Queued</div></div>
+  <div class="card"><div class="n">{{.Counts.Sent}}</div><div class="l">Sent</div></div>
+  <div class="card"><div class="n">{{.Counts.Deferred}}</div><div class="l">Deferred</div></div>
+  <div class="card"><div class="n">{{.Counts.Failed}}</div><div class="l">Failed</div></div>
+  <div class="card"><div class="n">{{.Counts.LastHour}}</div><div class="l">Last hour</div></div>
+  <div class="card"><div class="n">{{.Counts.Endpoints}}</div><div class="l">Webhooks</div></div>
+</div>
+<table>
+  <tr><th>Setting</th><th>Value</th></tr>
+  <tr><td>Sending</td><td>{{if .SendEnabled}}<span class="badge ok">enabled</span>{{else}}<span class="badge warn">disabled</span>{{end}}</td></tr>
+  <tr><td>Hourly ceiling</td><td>{{if .MaxPerHour}}{{.MaxPerHour}}{{else}}<span class="muted">not set</span>{{end}}</td></tr>
+  <tr><td>Environment</td><td>{{.Env}}</td></tr>
+  <tr><td>Version</td><td class="mono">{{.Version}}</td></tr>
+</table>
+{{end}}
+
+{{define "page-domains"}}
+<h1>Domains</h1>
+{{if not .Domains}}<div class="card empty">No domains yet. Add one with <code>aiemail domains add -name example.com</code></div>{{end}}
+{{range .Domains}}
+<table style="margin-bottom:1rem">
+  <tr>
+    <th style="width:30%">{{.Name}}</th>
+    <th>
+      {{if eq .Status "verified"}}<span class="badge ok">verified</span>
+      {{else if eq .Status "suspended"}}<span class="badge bad">suspended</span>
+      {{else}}<span class="badge warn">pending</span>{{end}}
+      {{if .LastCheckedAt}}<span class="muted"> · checked {{.LastCheckedAt}}</span>{{end}}
+    </th>
+  </tr>
+  <tr>
+    <td>Ownership proof</td>
+    <td><code class="dns">_aiemail.{{.Name}}   TXT   "{{.Token}}"</code></td>
+  </tr>
+  {{if .DKIMRecord}}
+  <tr>
+    <td>DKIM</td>
+    <td><code class="dns">{{.DKIMSelector}}._domainkey.{{.Name}}   TXT   "{{.DKIMRecord}}"</code></td>
+  </tr>
+  {{end}}
+  <tr>
+    <td>SPF</td>
+    <td><code class="dns">{{.Name}}   TXT   "v=spf1 include:{{.Name}} ~all"</code></td>
+  </tr>
+  <tr>
+    <td>DMARC</td>
+    <td><code class="dns">_dmarc.{{.Name}}   TXT   "v=DMARC1; p=none; rua=mailto:dmarc@{{.Name}}"</code></td>
+  </tr>
+</table>
+{{end}}
+<p class="muted">Proof is re-checked daily. A domain that stops publishing its record is suspended, because a lapsed domain may belong to someone else.</p>
+{{end}}
+
+{{define "page-keys"}}
+<h1>API keys</h1>
+{{if not .Keys}}<div class="card empty">No keys yet. Create one with <code>aiemail keys create -name production</code></div>{{else}}
+<table>
+  <tr><th>Name</th><th>Key</th><th>Scopes</th><th>Quota/h</th><th>Expires</th><th>Last used</th><th></th></tr>
+  {{range .Keys}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td class="mono">{{.Prefix}}</td>
+    <td class="muted">{{range .Scopes}}{{.}} {{end}}</td>
+    <td>{{if .Quota}}{{.Quota}}{{else}}<span class="muted">—</span>{{end}}</td>
+    <td>{{.ExpiresAt}}</td>
+    <td>{{if .LastUsedAt}}{{.LastUsedAt}}{{if .LastUsedIP}}<br><span class="muted mono">{{.LastUsedIP}}</span>{{end}}{{else}}<span class="muted">never</span>{{end}}</td>
+    <td>
+      {{if .RevokedAt}}<span class="badge bad">revoked</span>
+      {{else if .Expired}}<span class="badge warn">expired</span>
+      {{else}}
+      <form method="post" action="/console/keys/revoke" class="inline">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <button class="danger">Revoke</button>
+      </form>
+      {{end}}
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+<p class="muted">A secret is shown once, at creation, and only its hash is stored. Revoking takes effect immediately.</p>
+{{end}}
+
+{{define "page-messages"}}
+<h1>Messages</h1>
+<p class="muted">
+  <a href="/console/messages">all</a> ·
+  <a href="/console/messages?status=queued">queued</a> ·
+  <a href="/console/messages?status=deferred">deferred</a> ·
+  <a href="/console/messages?status=failed">failed</a>
+</p>
+{{if not .Messages}}<div class="card empty">Nothing to show.</div>{{else}}
+<table>
+  <tr><th>Created</th><th>Status</th><th>To</th><th>Subject</th><th>Tries</th><th>Detail</th></tr>
+  {{range .Messages}}
+  <tr>
+    <td class="muted">{{.CreatedAt}}</td>
+    <td>
+      {{if eq .Status "failed"}}<span class="badge bad">{{.Status}}</span>
+      {{else if eq .Status "deferred"}}<span class="badge warn">{{.Status}}</span>
+      {{else if eq .Status "queued"}}<span class="badge warn">{{.Status}}</span>
+      {{else}}<span class="badge ok">{{.Status}}</span>{{end}}
+      {{if .SignedAt}}<br><span class="muted" style="font-size:.75rem">signed</span>{{end}}
+    </td>
+    <td class="mono">{{range .Recipients}}{{.}} {{end}}</td>
+    <td>{{.Subject}}</td>
+    <td>{{.Attempts}}</td>
+    <td class="muted">{{if .LastError}}{{.LastError}}{{else}}—{{end}}</td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+{{end}}
