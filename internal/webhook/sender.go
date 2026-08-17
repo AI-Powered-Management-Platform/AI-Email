@@ -59,7 +59,7 @@ func (s *Sender) Send(ctx context.Context, url string, secret, payload []byte) R
 	if err != nil {
 		return Result{Retry, fmt.Sprintf("request failed: %v", err)}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxResponseBytes))
 
 	switch {

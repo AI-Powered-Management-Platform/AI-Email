@@ -52,6 +52,13 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # Pinned like govulncheck below — a linter that silently changes
+      # version is a supply-chain dependency like any other.
+      - name: golangci-lint
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+          golangci-lint run ./...
+
       - name: Build
         run: go build ./...
 
@@ -72,6 +79,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # secret scan covers full history
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -81,3 +90,10 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
           govulncheck ./...
+      # The gitleaks CLI is MIT-licensed; the marketplace action wrapper needs
+      # a paid licence for organization repos, so we run the binary directly,
+      # pinned like every other scanner. --redact keeps any hit out of CI logs.
+      - name: gitleaks
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          gitleaks git --redact --no-banner

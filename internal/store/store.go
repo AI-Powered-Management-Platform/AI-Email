@@ -73,7 +73,7 @@ func Migrate(ctx context.Context, dsn string) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := prepareGoose(); err != nil {
 		return err
@@ -90,7 +90,7 @@ func SchemaVersion(ctx context.Context, dsn string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := prepareGoose(); err != nil {
 		return 0, err
