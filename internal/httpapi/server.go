@@ -16,6 +16,7 @@ import (
 
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/config"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/store"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/unsubscribe"
 )
 
 // The HTTP layer depends on narrow interfaces so handlers can be tested
@@ -36,6 +37,7 @@ type (
 		EnqueueMessage(ctx context.Context, in store.NewMessage) (*store.Message, bool, error)
 		MessageByID(ctx context.Context, id string) (*store.Message, error)
 		FilterSuppressed(ctx context.Context, addresses []string) (allowed, blocked []string, err error)
+		Suppress(ctx context.Context, address, reason, detail, messageID string) error
 	}
 )
 
@@ -46,26 +48,28 @@ type ConsoleUI interface {
 }
 
 type Server struct {
-	cfg      *config.Config
-	log      *slog.Logger
-	db       Pinger
-	keys     KeyStore
-	messages MessageStore
-	console  ConsoleUI
-	version  string
-	started  time.Time
+	cfg               *config.Config
+	log               *slog.Logger
+	db                Pinger
+	keys              KeyStore
+	messages          MessageStore
+	console           ConsoleUI
+	unsubscribeSecret []byte
+	version           string
+	started           time.Time
 }
 
 func New(cfg *config.Config, log *slog.Logger, db Pinger, keyStore KeyStore, messageStore MessageStore, ui ConsoleUI, version string) *Server {
 	return &Server{
-		cfg:      cfg,
-		log:      log,
-		db:       db,
-		keys:     keyStore,
-		messages: messageStore,
-		console:  ui,
-		version:  version,
-		started:  time.Now(),
+		cfg:               cfg,
+		log:               log,
+		db:                db,
+		keys:              keyStore,
+		messages:          messageStore,
+		console:           ui,
+		unsubscribeSecret: unsubscribe.DeriveSecret(cfg.DKIMMasterKey),
+		version:           version,
+		started:           time.Now(),
 	}
 }
 
@@ -74,6 +78,8 @@ func (s *Server) Handler() http.Handler {
 	if s.console != nil && s.console.Enabled() {
 		s.console.Routes(mux)
 	}
+	mux.HandleFunc("GET /u/{token}", s.handleUnsubscribeForm)
+	mux.HandleFunc("POST /u/{token}", s.handleUnsubscribe)
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /readyz", s.handleReady)
 	mux.HandleFunc("POST /v1/emails", s.requireKey(ScopeEmailsSend, s.handleSend))

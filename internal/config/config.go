@@ -47,6 +47,11 @@ type Config struct {
 	// ConsolePasswordHash enables the operator console. Absent, the console is
 	// not served at all: an interface that manages sending credentials should
 	// not exist without a way to protect it.
+	// PublicBaseURL is where recipients reach us, used for unsubscribe links.
+	// Offering a link nobody can reach is worse than offering none: it tells a
+	// provider we support unsubscribing when we do not.
+	PublicBaseURL string
+
 	ConsolePasswordHash string
 
 	// ConsoleSecureCookies marks the session cookie Secure. It follows the
@@ -103,6 +108,7 @@ func Load() (*Config, error) {
 		}
 	}
 
+	cfg.PublicBaseURL = strings.TrimSuffix(strings.TrimSpace(os.Getenv("AIEMAIL_PUBLIC_BASE_URL")), "/")
 	cfg.ConsolePasswordHash = strings.TrimSpace(os.Getenv("AIEMAIL_CONSOLE_PASSWORD_HASH"))
 	cfg.ConsoleSecureCookies = cfg.Env == EnvProduction
 
