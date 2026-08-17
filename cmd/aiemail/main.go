@@ -61,6 +61,11 @@ func run() error {
 			return runAddDomain(os.Args[3:])
 		}
 		return fmt.Errorf("usage: aiemail domains add -name DOMAIN")
+	case "webhooks":
+		if len(os.Args) > 2 && os.Args[2] == "add" {
+			return runAddWebhook(os.Args[3:])
+		}
+		return fmt.Errorf("usage: aiemail webhooks add -url URL")
 	case "console":
 		if len(os.Args) > 2 && os.Args[2] == "password" {
 			return runConsolePassword(os.Args[3:])
@@ -217,7 +222,7 @@ func runWorker() error {
 		return err
 	}
 
-	run("delivery", worker.New(db, delivery.NewEngine(cfg.EngineURL), db, dkim.NewSigner(keeper), log, cfg.MaxSendPerHour).Run)
+	run("delivery", worker.New(db, delivery.NewEngine(cfg.EngineURL), db, dkim.NewSigner(keeper), db, log, cfg.MaxSendPerHour).Run)
 	run("webhooks", worker.NewDispatcher(db, webhook.NewSender(20*time.Second), log).Run)
 	run("domains", worker.NewDomainChecker(db, dnsverify.New(nil, 10*time.Second), log).Run)
 

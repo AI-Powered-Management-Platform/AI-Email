@@ -42,6 +42,13 @@ type Sender interface {
 	Send(ctx context.Context, msg delivery.Message) delivery.Response
 }
 
+// EventPublisher fans a lifecycle event out to webhook endpoints. It is part
+// of the delivery path rather than a separate sweep so an event cannot be
+// recorded and then silently never delivered.
+type EventPublisher interface {
+	EnqueueDelivery(ctx context.Context, eventID, messageID string, payload []byte) error
+}
+
 // KeyStore supplies wrapped signing material. It never returns a usable key.
 type KeyStore interface {
 	SigningKeyForMessage(ctx context.Context, messageID string) (*store.SigningKey, error)
@@ -57,12 +64,41 @@ type Worker struct {
 	sender     Sender
 	keys       KeyStore
 	signer     MessageSigner
+	events     EventPublisher
 	log        *slog.Logger
 	maxPerHour int
 }
 
-func New(queue Queue, sender Sender, keys KeyStore, signer MessageSigner, log *slog.Logger, maxPerHour int) *Worker {
-	return &Worker{queue: queue, sender: sender, keys: keys, signer: signer, log: log, maxPerHour: maxPerHour}
+func New(queue Queue, sender Sender, keys KeyStore, signer MessageSigner, events EventPublisher, log *slog.Logger, maxPerHour int) *Worker {
+	return &Worker{
+		queue:      queue,
+		sender:     sender,
+		keys:       keys,
+		signer:     signer,
+		events:     events,
+		log:        log,
+		maxPerHour: maxPerHour,
+	}
+}
+
+// publish queues one event for every active endpoint.
+//
+// The event id is derived from the message, type, and attempt so a retry after
+// a crash produces the same id, and the unique constraint turns the second
+// attempt into a no-op rather than a duplicate webhook.
+func (w *Worker) publish(ctx context.Context, messageID, eventType, reason string, attempt int) {
+	if w.events == nil {
+		return
+	}
+	eventID := fmt.Sprintf("%s:%s:%d", messageID, eventType, attempt)
+	payload, err := BuildPayload(eventID, eventType, messageID, reason, time.Now())
+	if err != nil {
+		w.log.Error("building webhook payload failed", "message_id", messageID, "error", err)
+		return
+	}
+	if err := w.events.EnqueueDelivery(ctx, eventID, messageID, payload); err != nil {
+		w.log.Error("queueing webhook failed", "message_id", messageID, "event", eventType, "error", err)
+	}
 }
 
 // Run drains the queue until the context is cancelled.
@@ -150,6 +186,7 @@ func (w *Worker) deliver(ctx context.Context, msg store.Claimed) {
 			return
 		}
 		w.log.Info("delivered", "message_id", msg.ID, "attempts", msg.Attempts)
+		w.publish(ctx, msg.ID, "email.sent", "", msg.Attempts)
 
 	case delivery.Temporary:
 		if msg.Attempts >= MaxAttempts {
@@ -162,6 +199,7 @@ func (w *Worker) deliver(ctx context.Context, msg store.Claimed) {
 			return
 		}
 		w.log.Info("deferred", "message_id", msg.ID, "attempts", msg.Attempts, "retry_at", retryAt)
+		w.publish(ctx, msg.ID, "email.deferred", resp.Reason, msg.Attempts)
 
 	case delivery.Permanent:
 		w.fail(ctx, msg, resp.Reason)
@@ -215,6 +253,7 @@ func (w *Worker) fail(ctx context.Context, msg store.Claimed, reason string) {
 		return
 	}
 	w.log.Warn("delivery failed", "message_id", msg.ID, "attempts", msg.Attempts, "reason", reason)
+	w.publish(ctx, msg.ID, "email.failed", reason, msg.Attempts)
 }
 
 // Backoff grows exponentially and is capped. Retrying a struggling destination

@@ -113,6 +113,19 @@ func (f *fakeKeys) MarkSigned(_ context.Context, id string) error {
 	return nil
 }
 
+// fakeEvents records what would be sent to webhook endpoints.
+type fakeEvents struct {
+	mu       sync.Mutex
+	enqueued []string
+}
+
+func (f *fakeEvents) EnqueueDelivery(_ context.Context, eventID, _ string, _ []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.enqueued = append(f.enqueued, eventID)
+	return nil
+}
+
 type fakeSigner struct{ err error }
 
 func (f fakeSigner) Sign(_ context.Context, _ dkim.Key, message []byte) ([]byte, error) {
@@ -125,7 +138,7 @@ func (f fakeSigner) Sign(_ context.Context, _ dkim.Key, message []byte) ([]byte,
 // newWorker wires a worker with working signing, so each test states only what
 // it cares about.
 func newWorker(q Queue, s Sender, maxPerHour int) *Worker {
-	return New(q, s, &fakeKeys{}, fakeSigner{}, quietLogger(), maxPerHour)
+	return New(q, s, &fakeKeys{}, fakeSigner{}, &fakeEvents{}, quietLogger(), maxPerHour)
 }
 
 func msg(id string, attempts int) store.Claimed {
@@ -232,7 +245,7 @@ func TestCeilingOfZeroMeansNoCeilingCheck(t *testing.T) {
 func TestMessageThatCannotBeSignedIsNeverSent(t *testing.T) {
 	q := newFakeQueue(msg("m1", 1))
 	s := &fakeSender{response: delivery.Response{Result: delivery.Sent}}
-	w := New(q, s, &fakeKeys{err: errors.New("no key for domain")}, fakeSigner{}, quietLogger(), 0)
+	w := New(q, s, &fakeKeys{err: errors.New("no key for domain")}, fakeSigner{}, &fakeEvents{}, quietLogger(), 0)
 
 	if _, err := w.tick(context.Background()); err != nil {
 		t.Fatalf("tick: %v", err)
@@ -248,7 +261,7 @@ func TestMessageThatCannotBeSignedIsNeverSent(t *testing.T) {
 func TestSigningFailureAlsoStopsDelivery(t *testing.T) {
 	q := newFakeQueue(msg("m1", 1))
 	s := &fakeSender{response: delivery.Response{Result: delivery.Sent}}
-	w := New(q, s, &fakeKeys{}, fakeSigner{err: errors.New("key unwrap failed")}, quietLogger(), 0)
+	w := New(q, s, &fakeKeys{}, fakeSigner{err: errors.New("key unwrap failed")}, &fakeEvents{}, quietLogger(), 0)
 
 	if _, err := w.tick(context.Background()); err != nil {
 		t.Fatalf("tick: %v", err)
@@ -262,7 +275,7 @@ func TestSignedMessageIsWhatGetsHandedToTheEngine(t *testing.T) {
 	q := newFakeQueue(msg("m1", 1))
 	var captured delivery.Message
 	s := &capturingSender{response: delivery.Response{Result: delivery.Sent}, capture: &captured}
-	w := New(q, s, &fakeKeys{}, fakeSigner{}, quietLogger(), 0)
+	w := New(q, s, &fakeKeys{}, fakeSigner{}, &fakeEvents{}, quietLogger(), 0)
 
 	if _, err := w.tick(context.Background()); err != nil {
 		t.Fatalf("tick: %v", err)
@@ -283,6 +296,54 @@ type capturingSender struct {
 func (s *capturingSender) Send(_ context.Context, msg delivery.Message) delivery.Response {
 	*s.capture = msg
 	return s.response
+}
+
+// Recording an event without queueing its webhook would leave a caller waiting
+// forever for a notification that never comes.
+func TestLifecycleEventsAreQueuedForWebhooks(t *testing.T) {
+	cases := map[string]struct {
+		response delivery.Response
+		want     string
+	}{
+		"sent":     {delivery.Response{Result: delivery.Sent}, "email.sent"},
+		"deferred": {delivery.Response{Result: delivery.Temporary, Reason: "greylisted"}, "email.deferred"},
+		"failed":   {delivery.Response{Result: delivery.Permanent, Reason: "no such user"}, "email.failed"},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			q := newFakeQueue(msg("m1", 1))
+			events := &fakeEvents{}
+			w := New(q, &fakeSender{response: tc.response}, &fakeKeys{}, fakeSigner{}, events, quietLogger(), 0)
+
+			if _, err := w.tick(context.Background()); err != nil {
+				t.Fatalf("tick: %v", err)
+			}
+			if len(events.enqueued) != 1 {
+				t.Fatalf("expected one queued webhook, got %v", events.enqueued)
+			}
+			if !strings.Contains(events.enqueued[0], tc.want) {
+				t.Fatalf("expected a %s event, got %q", tc.want, events.enqueued[0])
+			}
+		})
+	}
+}
+
+// A retry after a crash must not produce a second webhook for the same event.
+func TestEventIDsAreStableAcrossRetries(t *testing.T) {
+	first := &fakeEvents{}
+	q1 := newFakeQueue(msg("m1", 3))
+	New(q1, &fakeSender{response: delivery.Response{Result: delivery.Sent}}, &fakeKeys{}, fakeSigner{}, first, quietLogger(), 0).
+		tick(context.Background())
+
+	second := &fakeEvents{}
+	q2 := newFakeQueue(msg("m1", 3))
+	New(q2, &fakeSender{response: delivery.Response{Result: delivery.Sent}}, &fakeKeys{}, fakeSigner{}, second, quietLogger(), 0).
+		tick(context.Background())
+
+	if first.enqueued[0] != second.enqueued[0] {
+		t.Fatalf("the same delivery must produce the same event id: %q then %q", first.enqueued[0], second.enqueued[0])
+	}
 }
 
 func TestBackoffGrowsAndIsCapped(t *testing.T) {
