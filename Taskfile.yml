@@ -1,0 +1,31 @@
+# A6 — one verb set in every repository: test, lint, check.
+# Runner: https://taskfile.dev — a single static binary, identical behaviour
+# on Windows, Linux, macOS, and CI.
+version: '3'
+
+tasks:
+  test:
+    desc: Full test suite, no cache (G4). DB tests skip unless AIEMAIL_TEST_DATABASE_URL is set.
+    cmds:
+      - go test -count=1 ./...
+
+  lint:
+    desc: Format check and static analysis (G1, G2)
+    cmds:
+      - test -z "$(gofmt -l .)"
+      - go vet ./...
+
+  lint-deep:
+    desc: Full static analysis exactly as CI runs it (G2), pinned
+    cmds:
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+      - golangci-lint run ./...
+
+  build:
+    desc: Build everything (G3)
+    cmds:
+      - go build ./...
+
+  check:
+    desc: Everything runnable locally — run before every PR. Race (G5) is CI-only (needs cgo).
+    deps: [lint, build, test]
