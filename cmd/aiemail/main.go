@@ -18,6 +18,7 @@ import (
 
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/config"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/delivery"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dkim"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dnsverify"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/httpapi"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/store"
@@ -59,6 +60,8 @@ func run() error {
 			return runAddDomain(os.Args[3:])
 		}
 		return fmt.Errorf("usage: aiemail domains add -name DOMAIN")
+	case "keygen":
+		return runKeygen()
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -181,7 +184,12 @@ func runWorker() error {
 		}()
 	}
 
-	run("delivery", worker.New(db, delivery.NewEngine(cfg.EngineURL), log, cfg.MaxSendPerHour).Run)
+	keeper, err := dkim.NewEnvelopeKeeper(cfg.DKIMMasterKey)
+	if err != nil {
+		return err
+	}
+
+	run("delivery", worker.New(db, delivery.NewEngine(cfg.EngineURL), db, dkim.NewSigner(keeper), log, cfg.MaxSendPerHour).Run)
 	run("webhooks", worker.NewDispatcher(db, webhook.NewSender(20*time.Second), log).Run)
 	run("domains", worker.NewDomainChecker(db, dnsverify.New(nil, 10*time.Second), log).Run)
 

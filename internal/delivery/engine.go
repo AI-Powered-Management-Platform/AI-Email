@@ -40,6 +40,11 @@ type Message struct {
 	HTML    string            `json:"html,omitempty"`
 	Text    string            `json:"text,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
+
+	// Raw is the signed RFC 5322 message. When present the engine must
+	// transmit it byte for byte: re-rendering from the fields above would
+	// change the bytes DKIM signed and invalidate the signature.
+	Raw []byte `json:"raw,omitempty"`
 }
 
 type Engine struct {

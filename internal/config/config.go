@@ -8,6 +8,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -37,6 +38,11 @@ type Config struct {
 	// flood cannot flood if this ceiling holds. Zero means unlimited and is
 	// rejected in production.
 	MaxSendPerHour int
+
+	// DKIMMasterKey wraps every signing key at rest. It is required to send,
+	// because unsigned mail is refused by mailbox providers and because a
+	// plaintext signing key in the database is the worst secret we could hold.
+	DKIMMasterKey []byte
 
 	ShutdownGrace time.Duration
 }
@@ -74,6 +80,18 @@ func Load() (*Config, error) {
 		problems = append(problems, err.Error())
 	}
 	cfg.MaxSendPerHour = maxPerHour
+
+	if raw := strings.TrimSpace(os.Getenv("AIEMAIL_DKIM_MASTER_KEY")); raw != "" {
+		key, err := base64.StdEncoding.DecodeString(raw)
+		switch {
+		case err != nil:
+			problems = append(problems, "AIEMAIL_DKIM_MASTER_KEY must be base64")
+		case len(key) != 32:
+			problems = append(problems, fmt.Sprintf("AIEMAIL_DKIM_MASTER_KEY must decode to 32 bytes, got %d", len(key)))
+		default:
+			cfg.DKIMMasterKey = key
+		}
+	}
 
 	problems = append(problems, cfg.validate()...)
 	if len(problems) > 0 {
@@ -119,6 +137,9 @@ func (c *Config) validate() []string {
 		}
 		if c.MaxSendPerHour <= 0 {
 			problems = append(problems, "AIEMAIL_MAX_SEND_PER_HOUR must be greater than zero when sending is enabled")
+		}
+		if len(c.DKIMMasterKey) == 0 {
+			problems = append(problems, "AIEMAIL_DKIM_MASTER_KEY is required when sending is enabled; unsigned mail is refused by mailbox providers")
 		}
 	}
 
