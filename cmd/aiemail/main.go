@@ -16,8 +16,10 @@ import (
 	"time"
 
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/config"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/delivery"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/httpapi"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/store"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/worker"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -140,12 +142,31 @@ func runServe() error {
 }
 
 func runWorker() error {
-	_, log, err := boot()
+	cfg, log, err := boot()
 	if err != nil {
 		return err
 	}
-	log.Info("worker mode is not implemented yet")
-	return nil
+	if !cfg.SendEnabled {
+		return errors.New("sending is disabled on this deployment; set AIEMAIL_SEND_ENABLED=true to run the worker")
+	}
+
+	startupCtx, cancelStartup := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelStartup()
+
+	if err := store.Migrate(startupCtx, cfg.DatabaseURL); err != nil {
+		return err
+	}
+	db, err := store.Open(startupCtx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	w := worker.New(db, delivery.NewEngine(cfg.EngineURL), log, cfg.MaxSendPerHour)
+	return w.Run(ctx)
 }
 
 func boot() (*config.Config, *slog.Logger, error) {
