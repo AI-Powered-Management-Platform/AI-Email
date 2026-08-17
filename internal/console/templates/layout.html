@@ -1,4 +1,4 @@
-{{define "layout"}}<!doctype html>
+﻿{{define "layout"}}<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -52,6 +52,7 @@ input{width:100%;font:inherit;background:#0d131b;color:var(--text);border:1px so
     <a href="/console/domains" {{if eq .Nav "domains"}}aria-current="page"{{end}}>Domains</a>
     <a href="/console/keys" {{if eq .Nav "keys"}}aria-current="page"{{end}}>Keys</a>
     <a href="/console/messages" {{if eq .Nav "messages"}}aria-current="page"{{end}}>Messages</a>
+    <a href="/console/suppressions" {{if eq .Nav "suppressions"}}aria-current="page"{{end}}>Suppressions</a>
   </nav>
   <form method="post" action="/console/logout" class="inline">
     <input type="hidden" name="csrf" value="{{.CSRF}}">

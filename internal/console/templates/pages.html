@@ -101,6 +101,39 @@
 <p class="muted">A secret is shown once, at creation, and only its hash is stored. Revoking takes effect immediately.</p>
 {{end}}
 
+{{define "page-suppressions"}}
+<h1>Suppressions</h1>
+<p class="muted">Addresses we will not send to. Removals are recorded in the log.</p>
+{{if not .Suppressions}}<div class="card empty">Nothing suppressed.</div>{{else}}
+<table>
+  <tr><th>Address</th><th>Reason</th><th>Detail</th><th>Since</th><th></th></tr>
+  {{range .Suppressions}}
+  <tr>
+    <td class="mono">{{.Address}}</td>
+    <td>
+      {{if eq .Reason "complaint"}}<span class="badge bad">complaint</span>
+      {{else if eq .Reason "hard_bounce"}}<span class="badge bad">hard bounce</span>
+      {{else if eq .Reason "unsubscribe"}}<span class="badge warn">unsubscribed</span>
+      {{else}}<span class="badge warn">{{.Reason}}</span>{{end}}
+    </td>
+    <td class="muted">{{if .Detail}}{{.Detail}}{{else}}—{{end}}</td>
+    <td class="muted">{{.CreatedAt}}</td>
+    <td>
+      {{if ne .Reason "complaint"}}
+      <form method="post" action="/console/suppressions/remove" class="inline">
+        <input type="hidden" name="csrf" value="{{$.CSRF}}">
+        <input type="hidden" name="address" value="{{.Address}}">
+        <button>Remove</button>
+      </form>
+      {{else}}<span class="muted">kept</span>{{end}}
+    </td>
+  </tr>
+  {{end}}
+</table>
+{{end}}
+<p class="muted">Complaints cannot be removed here. Mailing someone who reported you as spam is the fastest way to lose a sending reputation.</p>
+{{end}}
+
 {{define "page-messages"}}
 <h1>Messages</h1>
 <p class="muted">

@@ -24,6 +24,8 @@ type Store interface {
 	ListMessages(ctx context.Context, status string, limit int) ([]store.MessageRow, error)
 	DashboardCounts(ctx context.Context) (store.Counts, error)
 	RevokeAPIKey(ctx context.Context, id int64) error
+	ListSuppressions(ctx context.Context, limit int) ([]store.Suppression, error)
+	Unsuppress(ctx context.Context, address string) error
 }
 
 type Options struct {
@@ -60,6 +62,8 @@ func (c *Console) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /console/domains", c.guard("domains", c.domains))
 	mux.HandleFunc("GET /console/keys", c.guard("keys", c.keys))
 	mux.HandleFunc("GET /console/messages", c.guard("messages", c.messages))
+	mux.HandleFunc("GET /console/suppressions", c.guard("suppressions", c.suppressions))
+	mux.HandleFunc("POST /console/suppressions/remove", c.guardPost(c.unsuppress))
 	mux.HandleFunc("POST /console/keys/revoke", c.guardPost(c.revokeKey))
 	mux.HandleFunc("POST /console/logout", c.guardPost(c.logout))
 	mux.HandleFunc("GET /console/login", c.loginForm)
@@ -67,19 +71,20 @@ func (c *Console) Routes(mux *http.ServeMux) {
 }
 
 type view struct {
-	Title       string
-	Nav         string
-	Authed      bool
-	CSRF        string
-	Error       string
-	Env         string
-	Version     string
-	SendEnabled bool
-	MaxPerHour  int
-	Counts      store.Counts
-	Domains     []domainView
-	Keys        []keyView
-	Messages    []messageView
+	Title        string
+	Nav          string
+	Authed       bool
+	CSRF         string
+	Error        string
+	Env          string
+	Version      string
+	SendEnabled  bool
+	MaxPerHour   int
+	Counts       store.Counts
+	Domains      []domainView
+	Keys         []keyView
+	Messages     []messageView
+	Suppressions []suppressionView
 }
 
 func (c *Console) render(w http.ResponseWriter, page string, data view) {
@@ -248,6 +253,39 @@ func (c *Console) messages(w http.ResponseWriter, r *http.Request, v view) {
 		v.Messages = append(v.Messages, newMessageView(m))
 	}
 	c.render(w, "page-messages", v)
+}
+
+func (c *Console) suppressions(w http.ResponseWriter, r *http.Request, v view) {
+	rows, err := c.store.ListSuppressions(r.Context(), 500)
+	if err != nil {
+		c.fail(w, "loading suppressions", err)
+		return
+	}
+	v.Title = "Suppressions"
+	for _, s := range rows {
+		v.Suppressions = append(v.Suppressions, newSuppressionView(s))
+	}
+	c.render(w, "page-suppressions", v)
+}
+
+// unsuppress removes an address from the list.
+//
+// This exists because suppression is occasionally wrong — a provider
+// misreports, or an address is fixed — and an operator needs a way back. It is
+// logged loudly: re-enabling mail to an address that complained is how a
+// sender loses a reputation, so the action should always be traceable.
+func (c *Console) unsuppress(w http.ResponseWriter, r *http.Request) {
+	address := r.PostFormValue("address")
+	if address == "" {
+		http.Error(w, "no address given", http.StatusBadRequest)
+		return
+	}
+	if err := c.store.Unsuppress(r.Context(), address); err != nil {
+		c.log.Error("removing suppression failed", "error", err)
+	} else {
+		c.log.Warn("suppression removed from console", "remote", r.RemoteAddr)
+	}
+	http.Redirect(w, r, "/console/suppressions", http.StatusSeeOther)
 }
 
 func (c *Console) revokeKey(w http.ResponseWriter, r *http.Request) {

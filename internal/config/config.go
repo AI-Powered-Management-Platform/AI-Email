@@ -44,6 +44,16 @@ type Config struct {
 	// plaintext signing key in the database is the worst secret we could hold.
 	DKIMMasterKey []byte
 
+	// MTASTSHosts are the mail exchangers covered by our published policy.
+	// Empty means no policy is served, which is honest: advertising one we do
+	// not serve breaks delivery for senders that fetch it.
+	MTASTSHosts  []string
+	MTASTSMode   string
+	MTASTSMaxAge int
+
+	SecurityContact   string
+	SecurityPolicyURL string
+
 	// ConsolePasswordHash enables the operator console. Absent, the console is
 	// not served at all: an interface that manages sending credentials should
 	// not exist without a way to protect it.
@@ -109,6 +119,17 @@ func Load() (*Config, error) {
 	}
 
 	cfg.PublicBaseURL = strings.TrimSuffix(strings.TrimSpace(os.Getenv("AIEMAIL_PUBLIC_BASE_URL")), "/")
+	cfg.MTASTSHosts = splitList(os.Getenv("AIEMAIL_MTA_STS_HOSTS"))
+	cfg.MTASTSMode = envOr("AIEMAIL_MTA_STS_MODE", "testing")
+	cfg.MTASTSMaxAge = 604800
+	if age, err := envInt("AIEMAIL_MTA_STS_MAX_AGE", 604800); err != nil {
+		problems = append(problems, err.Error())
+	} else {
+		cfg.MTASTSMaxAge = age
+	}
+	cfg.SecurityContact = strings.TrimSpace(os.Getenv("AIEMAIL_SECURITY_CONTACT"))
+	cfg.SecurityPolicyURL = strings.TrimSpace(os.Getenv("AIEMAIL_SECURITY_POLICY_URL"))
+
 	cfg.ConsolePasswordHash = strings.TrimSpace(os.Getenv("AIEMAIL_CONSOLE_PASSWORD_HASH"))
 	cfg.ConsoleSecureCookies = cfg.Env == EnvProduction
 
@@ -146,6 +167,19 @@ func (c *Config) validate() []string {
 
 	if c.MaxSendPerHour < 0 {
 		problems = append(problems, "AIEMAIL_MAX_SEND_PER_HOUR cannot be negative")
+	}
+
+	if len(c.MTASTSHosts) > 0 {
+		switch c.MTASTSMode {
+		case "testing", "enforce", "none":
+		default:
+			problems = append(problems, fmt.Sprintf("AIEMAIL_MTA_STS_MODE must be testing, enforce or none, got %q", c.MTASTSMode))
+		}
+		// Below a day a policy is refetched constantly; above a year a mistake
+		// stays cached long after it is fixed.
+		if c.MTASTSMaxAge < 86400 || c.MTASTSMaxAge > 31557600 {
+			problems = append(problems, "AIEMAIL_MTA_STS_MAX_AGE must be between 86400 and 31557600 seconds")
+		}
 	}
 
 	if c.SendEnabled {
@@ -200,6 +234,16 @@ func validateEngineURL(raw string) error {
 }
 
 func (c *Config) IsProduction() bool { return c.Env == EnvProduction }
+
+func splitList(raw string) []string {
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
 
 func envOr(key, fallback string) string {
 	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
