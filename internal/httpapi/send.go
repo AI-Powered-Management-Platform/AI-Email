@@ -14,6 +14,7 @@ import (
 
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/mail"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/store"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/template"
 )
 
 // maxBodyBytes bounds a send request. Attachments are not in this version, so
@@ -30,6 +31,7 @@ type sendRequest struct {
 	Headers     map[string]string `json:"headers"`
 	Tags        map[string]string `json:"tags"`
 	ScheduledAt string            `json:"scheduled_at"`
+	Variables   map[string]string `json:"variables"`
 }
 
 func (s *Server) handleSend(w http.ResponseWriter, r *http.Request) {
@@ -132,10 +134,25 @@ func (s *Server) buildMessage(r *http.Request, key *store.APIKey, req *sendReque
 	}
 	recipients = allowed
 
-	if err := mail.ValidateSubject(req.Subject); err != nil {
+	// Merge tags are substituted here so a broken template is reported to the
+	// caller now, rather than failing later where only we would see it.
+	subject, err := template.Render(req.Subject, req.Variables, false)
+	if err != nil {
 		return nil, fmt.Sprintf("subject: %v", err)
 	}
-	if strings.TrimSpace(req.HTML) == "" && strings.TrimSpace(req.Text) == "" {
+	bodyHTML, err := template.Render(req.HTML, req.Variables, true)
+	if err != nil {
+		return nil, fmt.Sprintf("html: %v", err)
+	}
+	bodyText, err := template.Render(req.Text, req.Variables, false)
+	if err != nil {
+		return nil, fmt.Sprintf("text: %v", err)
+	}
+
+	if err := mail.ValidateSubject(subject); err != nil {
+		return nil, fmt.Sprintf("subject: %v", err)
+	}
+	if strings.TrimSpace(bodyHTML) == "" && strings.TrimSpace(bodyText) == "" {
 		return nil, "either html or text is required"
 	}
 	if req.ReplyTo != "" {
@@ -187,9 +204,9 @@ func (s *Server) buildMessage(r *http.Request, key *store.APIKey, req *sendReque
 		DomainID:       domain.ID,
 		FromAddress:    from.Email,
 		Recipients:     recipients,
-		Subject:        req.Subject,
-		BodyHTML:       req.HTML,
-		BodyText:       req.Text,
+		Subject:        subject,
+		BodyHTML:       bodyHTML,
+		BodyText:       bodyText,
 		Headers:        headers,
 		Tags:           tags,
 		ScheduledAt:    scheduledAt,
