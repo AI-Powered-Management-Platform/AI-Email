@@ -8,11 +8,15 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"math"
 	"time"
 
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/delivery"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dkim"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/mail"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/store"
 )
 
@@ -38,15 +42,27 @@ type Sender interface {
 	Send(ctx context.Context, msg delivery.Message) delivery.Response
 }
 
+// KeyStore supplies wrapped signing material. It never returns a usable key.
+type KeyStore interface {
+	SigningKeyForMessage(ctx context.Context, messageID string) (*store.SigningKey, error)
+	MarkSigned(ctx context.Context, messageID string) error
+}
+
+type MessageSigner interface {
+	Sign(ctx context.Context, key dkim.Key, message []byte) ([]byte, error)
+}
+
 type Worker struct {
 	queue      Queue
 	sender     Sender
+	keys       KeyStore
+	signer     MessageSigner
 	log        *slog.Logger
 	maxPerHour int
 }
 
-func New(queue Queue, sender Sender, log *slog.Logger, maxPerHour int) *Worker {
-	return &Worker{queue: queue, sender: sender, log: log, maxPerHour: maxPerHour}
+func New(queue Queue, sender Sender, keys KeyStore, signer MessageSigner, log *slog.Logger, maxPerHour int) *Worker {
+	return &Worker{queue: queue, sender: sender, keys: keys, signer: signer, log: log, maxPerHour: maxPerHour}
 }
 
 // Run drains the queue until the context is cancelled.
@@ -104,6 +120,15 @@ func (w *Worker) tick(ctx context.Context) (int, error) {
 }
 
 func (w *Worker) deliver(ctx context.Context, msg store.Claimed) {
+	raw, err := w.sign(ctx, msg)
+	if err != nil {
+		// Unsigned mail is refused by mailbox providers and damages the domain
+		// that sent it, so a signing failure stops the message rather than
+		// letting it go out bare.
+		w.fail(ctx, msg, "could not sign message: "+err.Error())
+		return
+	}
+
 	resp := w.sender.Send(ctx, delivery.Message{
 		ID:      msg.ID,
 		From:    msg.FromAddress,
@@ -112,6 +137,7 @@ func (w *Worker) deliver(ctx context.Context, msg store.Claimed) {
 		HTML:    msg.BodyHTML,
 		Text:    msg.BodyText,
 		Headers: decodeHeaders(msg.Headers),
+		Raw:     raw,
 	})
 
 	switch resp.Result {
@@ -140,6 +166,47 @@ func (w *Worker) deliver(ctx context.Context, msg store.Claimed) {
 	case delivery.Permanent:
 		w.fail(ctx, msg, resp.Reason)
 	}
+}
+
+// sign builds the RFC 5322 message and signs it. The key is unwrapped inside
+// the signer and discarded with the call.
+func (w *Worker) sign(ctx context.Context, msg store.Claimed) ([]byte, error) {
+	if w.signer == nil || w.keys == nil {
+		return nil, errors.New("no signing key is configured")
+	}
+
+	key, err := w.keys.SigningKeyForMessage(ctx, msg.ID)
+	if err != nil {
+		return nil, fmt.Errorf("no active signing key for this domain: %w", err)
+	}
+
+	raw, err := mail.Build(mail.Envelope{
+		MessageID: msg.ID + "@" + key.Domain,
+		From:      msg.FromAddress,
+		To:        msg.Recipients,
+		Subject:   msg.Subject,
+		HTML:      msg.BodyHTML,
+		Text:      msg.BodyText,
+		Extra:     decodeHeaders(msg.Headers),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	signed, err := w.signer.Sign(ctx, dkim.Key{
+		Domain:    key.Domain,
+		Selector:  key.Selector,
+		Algorithm: key.Algorithm,
+		Wrapped:   key.Wrapped,
+	}, raw)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := w.keys.MarkSigned(ctx, msg.ID); err != nil {
+		w.log.Warn("could not record signing time", "message_id", msg.ID, "error", err)
+	}
+	return signed, nil
 }
 
 func (w *Worker) fail(ctx context.Context, msg store.Claimed, reason string) {

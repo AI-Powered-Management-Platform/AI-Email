@@ -4,11 +4,14 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base32"
+	"encoding/base64"
+	"errors"
 	"flag"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dkim"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/keys"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/store"
 )
@@ -120,13 +123,60 @@ func runAddDomain(args []string) error {
 		return err
 	}
 
+	if len(cfg.DKIMMasterKey) == 0 {
+		return errors.New("AIEMAIL_DKIM_MASTER_KEY is required to generate a signing key; generate one with: aiemail keygen")
+	}
+	keeper, err := dkim.NewEnvelopeKeeper(cfg.DKIMMasterKey)
+	if err != nil {
+		return err
+	}
+
+	selector := time.Now().UTC().Format("200601")
+	pair, err := dkim.Generate(keeper, selector)
+	if err != nil {
+		return err
+	}
+	if _, err := db.CreateSigningKey(ctx, id, pair.Selector, pair.Algorithm, pair.WrappedSecret, pair.PublicRecord); err != nil {
+		return err
+	}
+
 	fmt.Printf(`Domain %s registered, awaiting DNS proof.
 
-Publish this record, then verification will pass:
+Publish these records:
 
   _aiemail.%s   TXT   "%s"
 
-`, domain, domain, stored)
+  %s   TXT   "%s"
+
+  %s   TXT   "v=spf1 include:%s ~all"
+
+  _dmarc.%s   TXT   "v=DMARC1; p=none; rua=mailto:dmarc@%s"
+
+Start DMARC at p=none, read the reports, and move to quarantine then reject
+once you can see that legitimate mail passes.
+
+`, domain, domain, stored,
+		dkim.DNSRecordName(pair.Selector, domain), pair.PublicRecord,
+		domain, domain,
+		domain, domain)
+	return nil
+}
+
+// runKeygen prints a master key. It never writes one to disk: where the secret
+// lives is the operator's decision, and a file we created would be one more
+// copy nobody asked for.
+func runKeygen() error {
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return fmt.Errorf("generating master key: %w", err)
+	}
+	fmt.Printf(`AIEMAIL_DKIM_MASTER_KEY=%s
+
+Store this in your secret manager, not in a file beside the database. Losing
+it means every signing key must be regenerated and every DKIM record
+republished; leaking it means an attacker can sign mail as your domains.
+
+`, base64.StdEncoding.EncodeToString(key))
 	return nil
 }
 
