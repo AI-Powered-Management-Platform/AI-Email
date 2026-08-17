@@ -1,0 +1,34 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **Security flaws never go here.** Use the private channel in SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Release tag or commit hash you are running.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands and configuration. Redact secrets and DKIM material — placeholders must be obviously fake.
+    validations:
+      required: true
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: Expected vs actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Trimmed to the failure. No recipient addresses (T19), no credentials.
+      render: text

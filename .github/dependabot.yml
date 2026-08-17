@@ -1,0 +1,23 @@
+# Dependency updates arrive as reviewable PRs, never silently.
+# The cooldown window implements the P1 "dependency cooldown window" item in
+# SECURITY.md §16: a new release waits before being proposed, so a poisoned
+# release is usually caught upstream before it reaches us.
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    open-pull-requests-limit: 5
+
+  # Keeps the SHA-pinned actions in ci.yml current — Dependabot updates the
+  # pin and the version comment together.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
