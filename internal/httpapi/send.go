@@ -116,6 +116,22 @@ func (s *Server) buildMessage(r *http.Request, key *store.APIKey, req *sendReque
 		return nil, fmt.Sprintf("to: %v", err)
 	}
 
+	// Suppressed addresses are dropped at acceptance rather than at delivery.
+	// Queueing mail we already know we must not send wastes a send slot and
+	// risks it going out if the check is ever missed downstream.
+	allowed, blocked, err := s.messages.FilterSuppressed(r.Context(), recipients)
+	if err != nil {
+		return nil, "the recipient list could not be checked"
+	}
+	if len(allowed) == 0 {
+		return nil, fmt.Sprintf("every recipient is suppressed: %s", strings.Join(blocked, ", "))
+	}
+	if len(blocked) > 0 {
+		s.log.Info("dropped suppressed recipients",
+			"request_id", RequestIDFrom(r.Context()), "dropped", len(blocked), "kept", len(allowed))
+	}
+	recipients = allowed
+
 	if err := mail.ValidateSubject(req.Subject); err != nil {
 		return nil, fmt.Sprintf("subject: %v", err)
 	}
