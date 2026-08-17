@@ -65,6 +65,12 @@ jobs:
       - name: Test
         run: go test -count=1 ./...
 
+      # G9 — hot-path benchmarks (template render, DKIM sign, queue claim)
+      # compile and run one iteration so a regression that breaks them is
+      # caught here; full comparative runs happen on hot-path PRs.
+      - name: Benchmarks (smoke)
+        run: go test -run '^$' -bench . -benchtime 1x ./internal/template ./internal/dkim ./internal/store
+
       # Runs here rather than locally: the race detector needs cgo, and the
       # development machine has no C compiler.
       - name: Test with race detector

@@ -12,7 +12,7 @@ import (
 
 // These tests exercise real SQL. Claim semantics and transactional idempotency
 // cannot be proven against a fake: the guarantees live in Postgres.
-func testStore(t *testing.T) *store.Store {
+func testStore(t testing.TB) *store.Store {
 	t.Helper()
 	dsn := os.Getenv("AIEMAIL_TEST_DATABASE_URL")
 	if dsn == "" {
@@ -37,7 +37,7 @@ func testStore(t *testing.T) *store.Store {
 	return s
 }
 
-func seed(t *testing.T, s *store.Store) (keyID, domainID int64) {
+func seed(t testing.TB, s *store.Store) (keyID, domainID int64) {
 	t.Helper()
 	ctx := context.Background()
 
