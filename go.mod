@@ -2,6 +2,10 @@ module github.com/AI-Powered-Management-Platform/AI-Email
 
 go 1.26
 
+// Pinned to a patch release, not the 1.26 line: govulncheck found six
+// standard-library vulnerabilities in 1.26.5, all fixed here.
+toolchain go1.26.6
+
 require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/oklog/ulid/v2 v2.1.2
