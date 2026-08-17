@@ -14,12 +14,23 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // database/sql driver, used for migrations
 	"github.com/pressly/goose/v3"
 
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/crypto"
+
 	"github.com/AI-Powered-Management-Platform/AI-Email/migrations"
 )
 
 type Store struct {
 	Pool *pgxpool.Pool
+
+	// keeper encrypts recipient addresses at rest. When absent, recipients are
+	// stored in clear: that is the pre-encryption behaviour, kept only so a
+	// deployment without a master key still runs. Sending requires a master
+	// key, so any deployment that can send also encrypts.
+	keeper crypto.Keeper
 }
+
+// UseKeeper attaches envelope encryption for personal data.
+func (s *Store) UseKeeper(k crypto.Keeper) { s.keeper = k }
 
 func Open(ctx context.Context, dsn string) (*Store, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)

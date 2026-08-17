@@ -41,7 +41,7 @@ func (s *Store) ClaimMessages(ctx context.Context, limit int, lockFor time.Durat
 			LIMIT $1
 			FOR UPDATE SKIP LOCKED
 		)
-		RETURNING id, from_address, recipients, subject, body_html, body_text, headers, attempts`
+		RETURNING id, from_address, recipients, recipients_encrypted, subject, body_html, body_text, headers, attempts`
 
 	rows, err := s.Pool.Query(ctx, q, limit, lockFor.String())
 	if err != nil {
@@ -52,9 +52,14 @@ func (s *Store) ClaimMessages(ctx context.Context, limit int, lockFor time.Durat
 	var out []Claimed
 	for rows.Next() {
 		var c Claimed
-		if err := rows.Scan(&c.ID, &c.FromAddress, &c.Recipients, &c.Subject,
+		var clear []string
+		var encrypted []byte
+		if err := rows.Scan(&c.ID, &c.FromAddress, &clear, &encrypted, &c.Subject,
 			&c.BodyHTML, &c.BodyText, &c.Headers, &c.Attempts); err != nil {
 			return nil, fmt.Errorf("reading claimed message: %w", err)
+		}
+		if c.Recipients, err = s.unpackRecipients(encrypted, clear); err != nil {
+			return nil, err
 		}
 		out = append(out, c)
 	}
