@@ -35,6 +35,7 @@ type (
 		DomainByName(ctx context.Context, name string) (*store.Domain, error)
 		EnqueueMessage(ctx context.Context, in store.NewMessage) (*store.Message, bool, error)
 		MessageByID(ctx context.Context, id string) (*store.Message, error)
+		FilterSuppressed(ctx context.Context, addresses []string) (allowed, blocked []string, err error)
 	}
 )
 

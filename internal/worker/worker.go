@@ -14,6 +14,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/bounce"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/delivery"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dkim"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/mail"
@@ -49,6 +50,11 @@ type EventPublisher interface {
 	EnqueueDelivery(ctx context.Context, eventID, messageID string, payload []byte) error
 }
 
+// Suppressor records addresses that must not be contacted again.
+type Suppressor interface {
+	Suppress(ctx context.Context, address, reason, detail, messageID string) error
+}
+
 // KeyStore supplies wrapped signing material. It never returns a usable key.
 type KeyStore interface {
 	SigningKeyForMessage(ctx context.Context, messageID string) (*store.SigningKey, error)
@@ -60,24 +66,26 @@ type MessageSigner interface {
 }
 
 type Worker struct {
-	queue      Queue
-	sender     Sender
-	keys       KeyStore
-	signer     MessageSigner
-	events     EventPublisher
-	log        *slog.Logger
-	maxPerHour int
+	queue        Queue
+	sender       Sender
+	keys         KeyStore
+	signer       MessageSigner
+	events       EventPublisher
+	suppressions Suppressor
+	log          *slog.Logger
+	maxPerHour   int
 }
 
-func New(queue Queue, sender Sender, keys KeyStore, signer MessageSigner, events EventPublisher, log *slog.Logger, maxPerHour int) *Worker {
+func New(queue Queue, sender Sender, keys KeyStore, signer MessageSigner, events EventPublisher, suppressions Suppressor, log *slog.Logger, maxPerHour int) *Worker {
 	return &Worker{
-		queue:      queue,
-		sender:     sender,
-		keys:       keys,
-		signer:     signer,
-		events:     events,
-		log:        log,
-		maxPerHour: maxPerHour,
+		queue:        queue,
+		sender:       sender,
+		keys:         keys,
+		signer:       signer,
+		events:       events,
+		suppressions: suppressions,
+		log:          log,
+		maxPerHour:   maxPerHour,
 	}
 }
 
@@ -202,8 +210,39 @@ func (w *Worker) deliver(ctx context.Context, msg store.Claimed) {
 		w.publish(ctx, msg.ID, "email.deferred", resp.Reason, msg.Attempts)
 
 	case delivery.Permanent:
+		w.suppressIfAddressIsBad(ctx, msg, resp.Reason)
 		w.fail(ctx, msg, resp.Reason)
 	}
+}
+
+// suppressIfAddressIsBad adds recipients to the suppression list when the
+// destination said the address itself is bad.
+//
+// Classification decides, not the mere fact of a permanent failure: a message
+// rejected for its content must not cost us a real recipient, and a full
+// mailbox must never be mistaken for a dead one.
+func (w *Worker) suppressIfAddressIsBad(ctx context.Context, msg store.Claimed, reason string) {
+	if w.suppressions == nil {
+		return
+	}
+	verdict := bounce.Classify(reason)
+	if !verdict.Kind.Suppresses() {
+		return
+	}
+	for _, recipient := range msg.Recipients {
+		if err := w.suppressions.Suppress(ctx, recipient, suppressionReason(verdict.Kind), verdict.Reason, msg.ID); err != nil {
+			w.log.Error("could not suppress address", "message_id", msg.ID, "error", err)
+			continue
+		}
+		w.log.Warn("address suppressed", "message_id", msg.ID, "reason", verdict.Reason, "status", verdict.Status)
+	}
+}
+
+func suppressionReason(k bounce.Kind) string {
+	if k == bounce.Complaint {
+		return "complaint"
+	}
+	return "hard_bounce"
 }
 
 // sign builds the RFC 5322 message and signs it. The key is unwrapped inside

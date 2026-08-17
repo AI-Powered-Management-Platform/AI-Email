@@ -222,7 +222,7 @@ func runWorker() error {
 		return err
 	}
 
-	run("delivery", worker.New(db, delivery.NewEngine(cfg.EngineURL), db, dkim.NewSigner(keeper), db, log, cfg.MaxSendPerHour).Run)
+	run("delivery", worker.New(db, delivery.NewEngine(cfg.EngineURL), db, dkim.NewSigner(keeper), db, db, log, cfg.MaxSendPerHour).Run)
 	run("webhooks", worker.NewDispatcher(db, webhook.NewSender(20*time.Second), log).Run)
 	run("domains", worker.NewDomainChecker(db, dnsverify.New(nil, 10*time.Second), log).Run)
 
