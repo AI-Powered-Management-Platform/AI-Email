@@ -52,20 +52,25 @@ Rationale in [decisions.md](decisions.md). Controls in [../SECURITY.md](../SECUR
 Every P0 that applies to a REST-only, single-tenant sender. Full detail in
 [../SECURITY.md](../SECURITY.md).
 
-| Control | Threat |
-| --- | --- |
-| DKIM keys in KMS envelope, no export | T10 |
-| Short `x=` expiry, no `l=`, oversigned | T2 |
-| Sandboxed template render, no attribute access | T11 |
-| Header injection guard, CRLF stripped | T3 |
-| Webhook egress pinned, private ranges denied | T12 |
-| Domain proof re-checked daily, auto-suspend | T14 |
-| Scoped keys, expiry, quota, kill switch | T1 |
-| Per-IP hourly ceiling, cannot be exceeded | T4 |
-| Signed unsubscribe tokens, POST-only mutation | T16 |
-| Inbound parse caps before parsing | T17 |
-| Recipient fields encrypted, addresses redacted in logs | T19 |
-| MTA-STS honoured, TLS-RPT ingested | T6 |
+| Control | Threat | State |
+| --- | --- | --- |
+| Signing keys wrapped, no export path | T10 | ✅ |
+| Short `x=` expiry, no `l=`, oversigned | T2 | ✅ |
+| Logic-less template render, no attribute access | T11 | ✅ |
+| Header injection refused, not stripped | T3 | ✅ |
+| Webhook egress pinned, private ranges denied | T12 | ✅ |
+| Domain proof re-checked daily, auto-suspend | T14 | ✅ |
+| Scoped keys, expiry, quota, kill switch | T1 | ✅ |
+| Hourly ceiling, checked before claiming | T4 | ✅ |
+| Signed unsubscribe tokens, POST-only mutation | T16 | ✅ |
+| Bounce parse caps, classified not assumed | T17 | ✅ |
+| Recipient fields encrypted at rest | T19 | ✅ |
+| MTA-STS policy served | T6 | ✅ |
+| TLS-RPT report ingestion | T6 | ⬜ |
+
+⚠️ Wrapping uses a master key held outside the database. Moving that key into
+a managed KMS is the remaining step, and it changes one implementation of the
+Keeper interface rather than any caller.
 
 ⚠️ The per-IP ceiling is the backstop for every other bug. A defect that would
 flood cannot flood if the ceiling holds.

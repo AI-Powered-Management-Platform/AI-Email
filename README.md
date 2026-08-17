@@ -1,4 +1,4 @@
-# AI-Email
+﻿# AI-Email
 
 AI-assisted Email Service Provider. Sends transactional and bulk email, owns its
 sending IPs and reputation, and protects deliverability instead of renting it.
@@ -10,9 +10,9 @@ See [docs/v1-scope.md](docs/v1-scope.md).
 | --- | --- |
 | Sending engine | Operated, not written |
 | Control plane | Go, single binary |
-| Console | Next.js |
-| Queue | Redis + Postgres |
-| Status | V1 scoped, build starting |
+| Console | Served from the same binary |
+| Queue | Postgres |
+| Status | Send path built, awaiting a sending node |
 
 ⚠️ Port 25 is blocked on DigitalOcean. Sending nodes must run elsewhere.
 
@@ -36,15 +36,27 @@ deferred until a trigger forces it — see [docs/decisions.md](docs/decisions.md
 
 | Service | Language | Job | V1 |
 | --- | --- | --- | --- |
-| `aiemail` | Go | REST, templates, keys, events | ✅ |
-| `engine` | operated | SMTP out, retry, throttle | ✅ |
-| `console` | TypeScript | Vendor dashboard | ✅ |
+| `aiemail serve` | Go | REST, console, unsubscribe | ✅ built |
+| `aiemail worker` | Go | Delivery, webhooks, domain proof | ✅ built |
+| `engine` | operated | SMTP out, retry, throttle | ⬜ needs a node |
 | `relay` | Go | SMTP in, auth, accept | ⬜ deferred |
 | `mta` | Go | Our own queue engine | ⬜ deferred |
 | `ai` | Python | Scoring and content sidecar | ⬜ deferred |
 
-⚠️ `api` and `worker` are one binary with two run modes, not two deployments.
-Self-hosters should need one process to start.
+⚠️ One binary, two run modes, not two deployments. The console is served by
+`serve`, so a self-hosted deployment installs no runtime and starts one
+process per role.
+
+## Getting started
+
+```
+aiemail keygen                              # master key, store it in a secret manager
+aiemail domains add -name example.com       # prints DKIM, SPF, DMARC records
+aiemail keys create -name production        # secret shown once
+aiemail console password -password '…'      # enables /console
+aiemail serve                               # API and console
+aiemail worker                              # delivery, webhooks, domain proof
+```
 
 The features below describe the target product. V1 ships the subset in
 [docs/v1-scope.md](docs/v1-scope.md).
