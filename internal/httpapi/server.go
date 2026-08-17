@@ -38,23 +38,31 @@ type (
 	}
 )
 
+// ConsoleUI is the operator interface, mounted when configured.
+type ConsoleUI interface {
+	Enabled() bool
+	Routes(mux *http.ServeMux)
+}
+
 type Server struct {
 	cfg      *config.Config
 	log      *slog.Logger
 	db       Pinger
 	keys     KeyStore
 	messages MessageStore
+	console  ConsoleUI
 	version  string
 	started  time.Time
 }
 
-func New(cfg *config.Config, log *slog.Logger, db Pinger, keyStore KeyStore, messageStore MessageStore, version string) *Server {
+func New(cfg *config.Config, log *slog.Logger, db Pinger, keyStore KeyStore, messageStore MessageStore, ui ConsoleUI, version string) *Server {
 	return &Server{
 		cfg:      cfg,
 		log:      log,
 		db:       db,
 		keys:     keyStore,
 		messages: messageStore,
+		console:  ui,
 		version:  version,
 		started:  time.Now(),
 	}
@@ -62,6 +70,9 @@ func New(cfg *config.Config, log *slog.Logger, db Pinger, keyStore KeyStore, mes
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	if s.console != nil && s.console.Enabled() {
+		s.console.Routes(mux)
+	}
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /readyz", s.handleReady)
 	mux.HandleFunc("POST /v1/emails", s.requireKey(ScopeEmailsSend, s.handleSend))

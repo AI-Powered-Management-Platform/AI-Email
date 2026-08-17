@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/config"
+	"github.com/AI-Powered-Management-Platform/AI-Email/internal/console"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/delivery"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dkim"
 	"github.com/AI-Powered-Management-Platform/AI-Email/internal/dnsverify"
@@ -60,6 +61,11 @@ func run() error {
 			return runAddDomain(os.Args[3:])
 		}
 		return fmt.Errorf("usage: aiemail domains add -name DOMAIN")
+	case "console":
+		if len(os.Args) > 2 && os.Args[2] == "password" {
+			return runConsolePassword(os.Args[3:])
+		}
+		return fmt.Errorf("usage: aiemail console password")
 	case "keygen":
 		return runKeygen()
 	case "help", "-h", "--help":
@@ -110,9 +116,31 @@ func runServe() error {
 	}
 	log.Info("schema ready", "version", schema)
 
+	var ui httpapi.ConsoleUI
+	if cfg.ConsolePasswordHash != "" {
+		hash, err := console.ParsePasswordHash(cfg.ConsolePasswordHash)
+		if err != nil {
+			return err
+		}
+		ui, err = console.New(db, log, console.Options{
+			PasswordHash: hash,
+			Secure:       cfg.ConsoleSecureCookies,
+			Env:          cfg.Env,
+			Version:      version,
+			SendEnabled:  cfg.SendEnabled,
+			MaxPerHour:   cfg.MaxSendPerHour,
+		})
+		if err != nil {
+			return err
+		}
+		log.Info("console enabled", "path", "/console")
+	} else {
+		log.Info("console disabled", "reason", "AIEMAIL_CONSOLE_PASSWORD_HASH is not set")
+	}
+
 	srv := &http.Server{
 		Addr:              cfg.ListenAddr,
-		Handler:           httpapi.New(cfg, log, db, db, db, version).Handler(),
+		Handler:           httpapi.New(cfg, log, db, db, db, ui, version).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
