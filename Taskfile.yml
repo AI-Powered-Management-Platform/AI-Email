@@ -29,3 +29,8 @@ tasks:
   check:
     desc: Everything runnable locally — run before every PR. Race (G5) is CI-only (needs cgo).
     deps: [lint, build, test]
+
+  bench:
+    desc: Hot-path benchmarks (G9), one iteration each — same command CI runs
+    cmds:
+      - go test -run '^$' -bench . -benchtime 1x ./internal/template ./internal/dkim ./internal/store

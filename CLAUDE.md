@@ -17,6 +17,7 @@ re-arguing them.
 | `task test` | `go test -count=1 ./...` — DB tests skip unless `AIEMAIL_TEST_DATABASE_URL` is set |
 | `task lint` | gofmt check + `go vet` (G1, G2) |
 | `task lint-deep` | golangci-lint, pinned, exactly as CI runs it |
+| `task bench` | Hot-path benchmarks (G9), one iteration each |
 | `task check` | lint + build + test — run before every PR |
 
 ⚠️ The race detector (G5) runs in CI only: it needs cgo and the development
