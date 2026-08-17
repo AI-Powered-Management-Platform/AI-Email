@@ -78,6 +78,8 @@ func (s *Server) Handler() http.Handler {
 	if s.console != nil && s.console.Enabled() {
 		s.console.Routes(mux)
 	}
+	mux.HandleFunc("GET /.well-known/mta-sts.txt", s.handleMTASTSPolicy)
+	mux.HandleFunc("GET /.well-known/security.txt", s.handleSecurityTxt)
 	mux.HandleFunc("GET /u/{token}", s.handleUnsubscribeForm)
 	mux.HandleFunc("POST /u/{token}", s.handleUnsubscribe)
 	mux.HandleFunc("GET /healthz", s.handleHealth)

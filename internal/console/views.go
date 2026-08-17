@@ -89,6 +89,22 @@ func newMessageView(m store.MessageRow) messageView {
 	return v
 }
 
+type suppressionView struct {
+	Address   string
+	Reason    string
+	Detail    string
+	CreatedAt string
+}
+
+func newSuppressionView(s store.Suppression) suppressionView {
+	return suppressionView{
+		Address:   s.Address,
+		Reason:    s.Reason,
+		Detail:    s.Detail,
+		CreatedAt: s.CreatedAt.UTC().Format("2006-01-02 15:04"),
+	}
+}
+
 func formatTime(t *time.Time) string {
 	if t == nil {
 		return ""

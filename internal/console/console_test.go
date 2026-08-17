@@ -17,8 +17,9 @@ import (
 const testPassword = "correct-horse-battery"
 
 type fakeStore struct {
-	revoked []int64
-	msgs    []store.MessageRow
+	revoked      []int64
+	unsuppressed []string
+	msgs         []store.MessageRow
 }
 
 func (f *fakeStore) ListDomains(context.Context) ([]store.DomainRow, error) {
@@ -35,6 +36,16 @@ func (f *fakeStore) DashboardCounts(context.Context) (store.Counts, error) {
 }
 func (f *fakeStore) RevokeAPIKey(_ context.Context, id int64) error {
 	f.revoked = append(f.revoked, id)
+	return nil
+}
+func (f *fakeStore) ListSuppressions(context.Context, int) ([]store.Suppression, error) {
+	return []store.Suppression{
+		{Address: "bounced@example.org", Reason: "hard_bounce", Detail: "no such user", CreatedAt: time.Now()},
+		{Address: "angry@example.org", Reason: "complaint", CreatedAt: time.Now()},
+	}, nil
+}
+func (f *fakeStore) Unsuppress(_ context.Context, address string) error {
+	f.unsuppressed = append(f.unsuppressed, address)
 	return nil
 }
 
@@ -242,6 +253,62 @@ func TestAttackerAuthoredContentIsEscaped(t *testing.T) {
 	}
 	if rec.Header().Get("X-Frame-Options") != "DENY" {
 		t.Error("the console must refuse to be framed")
+	}
+}
+
+// A complaint must not be removable from the interface. Mailing someone who
+// reported you as spam is the fastest reputation loss available, so the page
+// offers no button for it.
+func TestComplaintsCannotBeRemovedFromTheConsole(t *testing.T) {
+	fake := &fakeStore{}
+	_, mux := newTestConsole(t, fake)
+	cookie, _ := signIn(t, mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/console/suppressions", nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if !strings.Contains(body, "bounced@example.org") || !strings.Contains(body, "angry@example.org") {
+		t.Fatal("both suppressions should be listed")
+	}
+
+	// The bounced address gets a remove form; the complaint gets none.
+	complaintSection := body[strings.Index(body, "angry@example.org"):]
+	if strings.Contains(complaintSection, "/console/suppressions/remove") {
+		t.Fatal("a complaint was offered a remove button")
+	}
+	if !strings.Contains(body, "/console/suppressions/remove") {
+		t.Fatal("a hard bounce should be removable")
+	}
+}
+
+func TestRemovingASuppressionNeedsTheRequestToken(t *testing.T) {
+	fake := &fakeStore{}
+	_, mux := newTestConsole(t, fake)
+	cookie, csrf := signIn(t, mux)
+
+	form := url.Values{"address": {"bounced@example.org"}}
+	bad := httptest.NewRequest(http.MethodPost, "/console/suppressions/remove", strings.NewReader(form.Encode()))
+	bad.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	bad.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, bad)
+
+	if rec.Code != http.StatusForbidden || len(fake.unsuppressed) != 0 {
+		t.Fatal("removal without a request token must be refused")
+	}
+
+	form.Set("csrf", csrf)
+	good := httptest.NewRequest(http.MethodPost, "/console/suppressions/remove", strings.NewReader(form.Encode()))
+	good.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	good.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, good)
+
+	if len(fake.unsuppressed) != 1 || fake.unsuppressed[0] != "bounced@example.org" {
+		t.Fatalf("expected the address to be removed, got %v", fake.unsuppressed)
 	}
 }
 
